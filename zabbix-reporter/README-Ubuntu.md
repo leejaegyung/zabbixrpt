@@ -246,6 +246,13 @@ ZABBIX_API_URL=https://zabbix.example.com/zabbix/api_jsonrpc.php
 - 비워두면 화면에서 입력한 인증 정보 또는 요청별 토큰을 사용할 수 있습니다.
 - 서버에서 고정 토큰을 사용하려면 Zabbix API 토큰을 넣습니다.
 
+토큰 저장 방식:
+
+- 화면의 `API Token` 칸에 입력한 값은 해당 브라우저의 `localStorage`에 저장됩니다.
+- 같은 PC와 같은 브라우저에서는 새로고침 또는 브라우저 재실행 후에도 유지됩니다.
+- 다른 PC에서는 브라우저 저장소가 공유되지 않으므로 화면 입력값이 자동으로 따라가지 않습니다.
+- 여러 PC에서 공통 토큰을 쓰려면 서버의 `/opt/zabbix-reporter/.env`에 `ZABBIX_API_TOKEN`을 설정하고, 화면의 `API Token` 칸은 비워두는 방식을 권장합니다.
+
 ## 6. 방화벽 설정
 
 Ubuntu에서 `ufw`를 사용한다면 리포터 접속 포트 `8080`을 허용합니다.
@@ -326,7 +333,121 @@ docker compose logs -f app
 docker compose logs -f web
 ```
 
-## 9. 권장 운영 구조
+## 9. GitHub 최신 소스로 재빌드
+
+서버에 GitHub 저장소를 clone해서 운영하는 경우, 최신 소스를 가져온 뒤 Docker 이미지를 다시 빌드하면 됩니다.
+
+먼저 `docker-compose.yml`이 있는 폴더로 이동합니다.
+
+일반적인 경로:
+
+```bash
+cd /opt/zabbix-reporter
+```
+
+만약 `scp`나 `git clone` 과정에서 폴더가 한 번 더 들어간 상태라면:
+
+```bash
+cd /opt/zabbix-reporter/zabbix-reporter
+```
+
+현재 위치가 맞는지 확인합니다.
+
+```bash
+ls
+```
+
+다음 파일과 폴더가 보여야 합니다.
+
+```text
+backend
+docker
+frontend
+docker-compose.yml
+.env.example
+```
+
+최신 소스를 가져옵니다.
+
+```bash
+git pull origin main
+```
+
+`.env` 파일이 없다면 한 번만 생성합니다.
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+이미 `.env`를 만들어서 Zabbix URL과 토큰을 넣어두었다면 다시 복사하지 않아도 됩니다. `.env`는 운영 서버 설정 파일이므로 보통 Git에 올라가지 않습니다.
+
+Docker 이미지를 다시 빌드하고 컨테이너를 재기동합니다.
+
+```bash
+docker compose up -d --build
+```
+
+상태 확인:
+
+```bash
+docker compose ps
+```
+
+로그 확인:
+
+```bash
+docker compose logs -f
+```
+
+접속 확인:
+
+```bash
+curl http://localhost:8080/up
+```
+
+`200` 응답이 나오면 정상입니다.
+
+브라우저에서 접속:
+
+```text
+http://서버IP:8080
+```
+
+### 전체 재빌드 명령 요약
+
+```bash
+cd /opt/zabbix-reporter
+git pull origin main
+docker compose up -d --build
+docker compose ps
+```
+
+경로가 중첩되어 있다면 첫 줄만 다음처럼 바꿉니다.
+
+```bash
+cd /opt/zabbix-reporter/zabbix-reporter
+git pull origin main
+docker compose up -d --build
+docker compose ps
+```
+
+## 10. Docker Context로 원격 재빌드
+
+소스를 서버에 직접 두지 않고 Windows PC에서 Docker Context로 배포하는 경우에는 Windows PowerShell에서 실행합니다.
+
+```powershell
+cd "C:\Users\leejk\OneDrive\바탕 화면\개인 프로잭트\자빅스 pdf\zabbix-reporter"
+
+git pull origin main
+
+docker --context zabbix-server compose up -d --build
+docker --context zabbix-server compose ps
+```
+
+이 방식은 Windows PC의 최신 소스를 원격 Ubuntu 서버 Docker 엔진으로 보내서 서버에서 이미지를 다시 빌드합니다.
+
+## 11. 권장 운영 구조
 
 Zabbix와 같은 Ubuntu 서버에서 사용할 경우 다음 구성을 권장합니다.
 
@@ -349,7 +470,7 @@ https://zabbix.example.com  -> 기존 Zabbix
 https://report.example.com  -> Zabbix Reporter
 ```
 
-## 10. 문제 해결
+## 12. 문제 해결
 
 ### 컨테이너가 실행되지 않을 때
 

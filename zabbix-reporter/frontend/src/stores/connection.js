@@ -1,10 +1,13 @@
 import { defineStore } from 'pinia'
 import { getLocalTodayStartString, getLocalTodayEndString } from '../composables/useFormat.js'
 
+const savedToken = localStorage.getItem('zabbixApiToken') || sessionStorage.getItem('zabbixApiToken') || ''
+if (savedToken) localStorage.setItem('zabbixApiToken', savedToken)
+
 export const useConnectionStore = defineStore('connection', {
   state: () => ({
     url: localStorage.getItem('zabbixApiUrl') || '',
-    token: sessionStorage.getItem('zabbixApiToken') || '',
+    token: savedToken,
     startDate: getLocalTodayStartString(),
     endDate: getLocalTodayEndString(),
   }),
@@ -20,7 +23,7 @@ export const useConnectionStore = defineStore('connection', {
     },
     setToken(v) {
       this.token = v
-      sessionStorage.setItem('zabbixApiToken', v)
+      localStorage.setItem('zabbixApiToken', v)
     },
   },
 })

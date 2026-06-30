@@ -4,11 +4,11 @@ import { computed } from 'vue'
 import { useDataStore } from '../../stores/data.js'
 import { useViewSettingsStore } from '../../stores/viewSettings.js'
 import { useAdvancedStore } from '../../stores/advanced.js'
-import { useConnectionStore } from '../../stores/connection.js'
 import { getItemId, getHostStatusInfo, getSeverityColor, getSeverityText, formatItemValue } from '../../composables/useFormat.js'
 import PdfPage from './PdfPage.vue'
 import AnalysisSection from '../analysis/AnalysisSection.vue'
 import Icon from '../common/Icon.vue'
+import ItemSparkline from '../common/ItemSparkline.vue'
 
 const HOSTS_PER_PAGE = 16
 const PROBLEMS_PER_PAGE = 16
@@ -16,7 +16,6 @@ const PROBLEMS_PER_PAGE = 16
 const data = useDataStore()
 const view = useViewSettingsStore()
 const adv = useAdvancedStore()
-const conn = useConnectionStore()
 
 const chunk = (arr, size) => {
   const out = []
@@ -47,18 +46,6 @@ const fmtDateTime = (clock) => new Date(parseInt(clock) * 1000).toLocaleString('
 
 const itemGridCols = computed(() => (adv.graphSize === 'small' ? 'grid-cols-3' : adv.graphSize === 'large' ? 'grid-cols-1' : 'grid-cols-2'))
 
-const baseUrl = computed(() => conn.url.replace(/api_jsonrpc\.php.*$/i, ''))
-const fmtGraph = (dt) => (dt ? dt.replace('T', ' ') + ':00' : '')
-const graphUrl = (item) => {
-  if (item.isMock) return `https://placehold.co/600x150/f9fafb/3b82f6?text=Zabbix+Graph+(${encodeURIComponent(item.name)})`
-  let u = `${baseUrl.value}chart.php?itemids[0]=${item.itemid}&type=0&width=600&height=150`
-  const { startDate, endDate } = conn
-  if (startDate && endDate) u += `&from=${fmtGraph(startDate)}&to=${fmtGraph(endDate)}`
-  else if (startDate) u += `&from=${fmtGraph(startDate)}&to=now`
-  else if (endDate) u += `&from=now-24h&to=${fmtGraph(endDate)}`
-  else u += `&from=now-24h&to=now`
-  return u
-}
 </script>
 
 <template>
@@ -137,7 +124,7 @@ const graphUrl = (item) => {
             <p class="text-xl font-black text-blue-600 whitespace-nowrap shrink-0">{{ formatItemValue(item) }}</p>
           </div>
           <div class="flex-grow w-full bg-gray-50 border border-gray-100 rounded-lg overflow-hidden flex justify-center items-center min-h-[120px]">
-            <img :src="graphUrl(item)" class="w-full h-full object-contain" />
+            <ItemSparkline :item="item" light />
           </div>
           <p class="text-[10px] text-gray-400 mt-2 text-right">마지막 수집: {{ fmtDateTime(item.lastclock) }}</p>
         </div>
