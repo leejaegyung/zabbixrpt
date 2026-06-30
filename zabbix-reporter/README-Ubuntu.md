@@ -185,6 +185,15 @@ cd /opt/zabbix-reporter
 
 ## 4. 환경 변수 설정
 
+Docker Compose 배포에서는 `zabbix-reporter/.env` 파일을 사용합니다.
+
+주의:
+
+- Docker 배포용: `/opt/zabbix-reporter/.env`
+- 로컬 Laravel 개발용: `/opt/zabbix-reporter/backend/.env`
+
+서버에서 Docker로 실행할 때는 `backend/.env`가 아니라 프로젝트 루트의 `.env`를 설정해야 합니다.
+
 프로젝트 루트에서 `.env.example`을 복사합니다.
 
 ```bash
