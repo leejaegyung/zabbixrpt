@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    @apply bg-canvas text-body font-sans antialiased;
+    /* 네이티브 컨트롤(날짜 달력·시간·select 드롭다운·스크롤바)을 다크로 렌더 */
+    color-scheme: dark;
+  }
+  /* 다크 캔버스용 폼 컨트롤 */
+  select option {
+    @apply bg-elevated-2 text-ink;
+  }
+  /* 체크박스/라디오 액센트를 Rosso로 */
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: #da291c;
+  }
+}
+
+@layer components {
+  /* 대문자 트래킹 라벨 (섹션 eyebrow) */
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-cta text-muted-soft;
+  }
+
+  /* 섹션 제목 (display weight 500, never bold) */
+  .display-title {
+    @apply text-2xl font-medium tracking-display text-ink;
+  }
+
+  /* Rosso Corsa 1차 CTA — 샤프, 대문자, 트래킹 */
+  .btn-rosso {
+    @apply inline-flex items-center justify-center gap-2 bg-rosso text-ink text-[13px] font-bold uppercase tracking-cta
+           px-6 py-3 rounded-none transition-colors hover:bg-rosso-active disabled:bg-elevated-2 disabled:text-muted disabled:cursor-not-allowed;
+  }
+
+  /* 아웃라인 CTA — 1px ink 보더 */
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 bg-transparent text-ink text-[13px] font-bold uppercase tracking-cta
+           px-6 py-3 rounded-none border border-hairline-strong transition-colors hover:border-ink hover:bg-white/5;
+  }
+
+  /* 고스트(아이콘) 버튼 */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center bg-elevated-2 text-body rounded-none border border-hairline
+           transition-colors hover:text-ink hover:border-hairline-strong;
+  }
+
+  /* 다크 elevated 카드 — 샤프, 헤어라인 보더, 그림자 없음 */
+  .card {
+    @apply bg-elevated border border-hairline rounded-none;
+  }
+
+  /* 입력 필드 — 다크, 4px 코너 */
+  .field {
+    @apply w-full bg-elevated-2 text-ink text-sm rounded-sm border border-hairline px-3 py-2.5
+           outline-none transition-colors placeholder:text-muted focus:border-rosso;
+  }
+
+  /* 숫자 디스플레이 (SLA·점유율 등) — tabular */
+  .stat-number {
+    @apply font-bold tracking-display tabular-nums leading-none;
+  }
+
+  /* badge pill — 유일하게 둥근 형태 */
+  .pill {
+    @apply inline-flex items-center text-[11px] font-semibold uppercase tracking-cta rounded-full px-3 py-1;
+  }
+}
+
+/* PDF 변환 시 폰트 부드럽게 렌더링 (보고서는 흰 종이 유지) */
+.pdf-page {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 숨김 처리되는 네이티브 파일 입력 */
+.hidden-input {
+  display: none;
+}
+
+/* 다크 스크롤바 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #181818;
+}
+::-webkit-scrollbar-thumb {
+  background: #3d3d3d;
+  border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #4a4a4a;
+}
+
+/* 날짜/시간 인풋 — color-scheme:dark 가 아이콘을 밝게 렌더하므로 invert 불필요 */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+  transition: 0.2s;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}

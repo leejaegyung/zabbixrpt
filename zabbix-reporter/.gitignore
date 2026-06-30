@@ -1,0 +1,14 @@
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Laravel
+backend/vendor/
+backend/.env
+backend/storage/*.key
+backend/public/build/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log

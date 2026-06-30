@@ -1,0 +1,8 @@
+**/node_modules
+**/vendor
+frontend/dist
+backend/.env
+backend/storage/logs/*
+backend/storage/framework/cache/*
+**/.git
+**/*.md

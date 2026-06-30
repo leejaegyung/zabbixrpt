@@ -1,0 +1,30 @@
+# Zabbix Report Exporter — 폐쇄망 대응 단일 스택.
+# 모든 의존성은 이미지 빌드 시점에 동봉되어 런타임 외부 네트워크 불필요.
+#   docker compose up -d --build
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: ${APP_KEY:-}
+      # Zabbix 대상 (UI에서 입력하면 요청별로 덮어씀; 서버 고정 시 여기 지정)
+      ZABBIX_API_URL: ${ZABBIX_API_URL:-}
+      ZABBIX_API_TOKEN: ${ZABBIX_API_TOKEN:-}
+      ZABBIX_ALLOW_REQUEST_URL: ${ZABBIX_ALLOW_REQUEST_URL:-true}
+    expose:
+      - "9000"
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      - app

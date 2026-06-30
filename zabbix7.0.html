@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zabbix PDF Exporter (Hybrid Mode)</title>
+
+  <!-- [하이브리드 설정] 1차: 온라인 CDN 시도 -> 2차: 실패 시 로컬(폐쇄망) 폴더 참조 자동 전환 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>window.tailwind || document.write('<script src="./assets/js/tailwindcss.com.js"><\\/script>')</script>
+
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script>window.React || document.write('<script src="./assets/js/react.development.js"><\\/script>')</script>
+
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script>window.ReactDOM || document.write('<script src="./assets/js/react-dom.development.js"><\\/script>')</script>
+
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script>window.Babel || document.write('<script src="./assets/js/babel.min.js"><\\/script>')</script>
+
+  <style>
+    /* PDF 변환 시 폰트 부드럽게 렌더링 */
+    .pdf-page {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .hidden-input {
+      display: none;
+    }
+
+    /* 스크롤바 커스텀 */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    /* 날짜/시간 인풋 아이콘 위치 최적화 */
+    input[type="date"]::-webkit-calendar-picker-indicator,
+    input[type="time"]::-webkit-calendar-picker-indicator,
+    input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+      cursor: pointer;
+      opacity: 0.6;
+      transition: 0.2s;
+    }
+
+    input[type="date"]::-webkit-calendar-picker-indicator:hover,
+    input[type="time"]::-webkit-calendar-picker-indicator:hover,
+    input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+      opacity: 1;
+    }
+  </style>
+</head>
+
+<body className="bg-gray-50">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // --- 아이콘 컴포넌트 정의 ---
+    const Download = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>;
+    const Server = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>;
+    const AlertCircle = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>;
+    const DatabaseIcon = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5V19A9 3 0 0 0 21 19V5"></path><path d="M3 12A9 3 0 0 0 21 12"></path></svg>;
+    const FileText = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>;
+    const Settings = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 0-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>;
+    const Loader2 = ({ className }) => <svg className={`${className} animate-spin`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>;
+    const Info = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>;
+    const CalendarIcon = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>;
+    const FilterIcon = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>;
+    const Activity = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>;
+    const LayoutDashboard = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"></rect><rect x="14" y="3" width="7" height="5" rx="1"></rect><rect x="14" y="12" width="7" height="9" rx="1"></rect><rect x="3" y="16" width="7" height="5" rx="1"></rect></svg>;
+    const XIcon = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
+    const HelpCircle = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>;
+    const Upload = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>;
+    const ImageIcon = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>;
+
+    // 추가 분석용 아이콘들
+    const CpuIcon = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>;
+    const HardDriveIcon = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="12" x2="2" y2="12"></line><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path><line x1="6" y1="16" x2="6.01" y2="16"></line><line x1="10" y1="16" x2="14" y2="16"></line></svg>;
+    const TrendingUpIcon = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>;
+    const SparklesIcon = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" /></svg>;
+    const GlobeIcon = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /><path d="M2 12h20" /></svg>;
+    const ShieldCheckIcon = ({ className }) => <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></svg>;
+
+    // --- 스토리지 80% 도달 예측(선형 회귀) 함수 ---
+    const calculateStoragePrediction = (history) => {
+      if (!history || history.length < 5) return { status: 'insufficient' };
+
+      const data = [...history].sort((a, b) => parseInt(a.clock) - parseInt(b.clock));
+      const n = data.length;
+      const startX = parseInt(data[0].clock);
+
+      let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+      data.forEach(p => {
+        const x = parseInt(p.clock) - startX;
+        const y = parseFloat(p.value);
+        sumX += x;
+        sumY += y;
+        sumXY += x * y;
+        sumXX += x * x;
+      });
+
+      const denominator = (n * sumXX) - (sumX * sumX);
+      if (denominator === 0) return { status: 'stable', current: parseFloat(data[n - 1].value) };
+
+      const m = ((n * sumXY) - (sumX * sumY)) / denominator;
+      const b = (sumY - (m * sumX)) / n;
+
+      const currentVal = parseFloat(data[n - 1].value);
+      if (currentVal >= 80) return { status: 'critical', current: currentVal, daysLeft: 0, growthPerDay: m * 86400 };
+      if (m <= 0) return { status: 'stable', current: currentVal, growthPerDay: m * 86400 };
+
+      const targetX = (80 - b) / m;
+      const targetClock = startX + targetX;
+      const now = Math.floor(Date.now() / 1000);
+
+      const secondsLeft = targetClock - now;
+      if (secondsLeft < 0) return { status: 'critical', current: currentVal, daysLeft: 0, growthPerDay: m * 86400 };
+
+      const daysLeft = secondsLeft / 86400;
+      if (daysLeft > 365) return { status: 'stable', current: currentVal, growthPerDay: m * 86400 };
+
+      return {
+        status: 'warning',
+        current: currentVal,
+        daysLeft: Math.round(daysLeft),
+        growthPerDay: m * 86400
+      };
+    };
+
+    // --- 수집된 히스토리 데이터의 '평균값'을 구하는 헬퍼 함수 ---
+    const getAverageValue = (item) => {
+      if (item.history && item.history.length > 0) {
+        const sum = item.history.reduce((acc, curr) => acc + parseFloat(curr.value), 0);
+        return sum / item.history.length;
+      }
+      return parseFloat(item.lastvalue) || 0;
+    };
+
+    // --- 간단한 SVG 기반 선 차트 (가상 데이터용) ---
+    const Sparkline = ({ data }) => {
+      if (!data || data.length < 2) return <div className="h-full flex items-center justify-center text-xs text-gray-400">데이터 없음</div>;
+      const width = 400, height = 80, padding = 5;
+      const values = data.map(d => parseFloat(d.value));
+      const minVal = Math.min(...values), maxVal = Math.max(...values);
+      const minClock = Math.min(...data.map(d => d.clock)), maxClock = Math.max(...data.map(d => d.clock));
+      const points = data.map(d => {
+        const x = ((d.clock - minClock) / (maxClock - minClock || 1)) * (width - padding * 2) + padding;
+        const y = height - (((parseFloat(d.value) - minVal) / (maxVal - minVal || 1)) * (height - padding * 2) + padding);
+        return `${x},${y}`;
+      }).join(' ');
+
+      return (
+        <div className="w-full h-24 mt-4 bg-gray-50 rounded-lg p-2 border border-gray-100 relative">
+          <div className="absolute top-2 left-2 text-[10px] text-gray-400">Max: {maxVal.toFixed(1)}</div>
+          <div className="absolute bottom-2 left-2 text-[10px] text-gray-400">Min: {minVal.toFixed(1)}</div>
+          <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+            <polyline fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
+          </svg>
+        </div>
+      );
+    };
+
+    // 시간 포맷 헬퍼
+    const getLocalTodayStartString = () => {
+      const date = new Date();
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}T00:00`;
+    };
+
+    const getLocalTodayEndString = () => {
+      const date = new Date();
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}T23:59`;
+    };
+
+    function App() {
+      // 로컬 스토리지 데이터 불러오기
+      const initialUrl = localStorage.getItem('zabbixApiUrl') || 'http://192.168.1.244/zabbix/api_jsonrpc.php';
+      const initialToken = localStorage.getItem('zabbixApiToken') || '';
+
+      const [url, setUrl] = useState(initialUrl);
+      const [token, setToken] = useState(initialToken);
+
+      const [startDate, setStartDate] = useState(getLocalTodayStartString());
+      const [endDate, setEndDate] = useState(getLocalTodayEndString());
+
+      const startDateRef = useRef(null);
+      const endDateRef = useRef(null);
+
+      const [hostsData, setHostsData] = useState([]);
+      const [problemsData, setProblemsData] = useState([]);
+      const [itemsData, setItemsData] = useState([]);
+      const [dataType, setDataType] = useState('dashboard');
+
+      const [selectedIds, setSelectedIds] = useState([]);
+      const [isExporting, setIsExporting] = useState(false);
+
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState('');
+      const [scriptsLoaded, setScriptsLoaded] = useState(false);
+
+      // 고급 설정 상태
+      const [customLogo, setCustomLogo] = useState(localStorage.getItem('zabbixCustomLogo') || '');
+      const [watermarkText, setWatermarkText] = useState(localStorage.getItem('zabbixWatermark') || '');
+      const [graphSize, setGraphSize] = useState(localStorage.getItem('zabbixGraphSize') || 'medium');
+
+      const [draftCustomLogo, setDraftCustomLogo] = useState(localStorage.getItem('zabbixCustomLogo') || '');
+      const [draftWatermarkText, setDraftWatermarkText] = useState(localStorage.getItem('zabbixWatermark') || '');
+      const [draftGraphSize, setDraftGraphSize] = useState(localStorage.getItem('zabbixGraphSize') || 'medium');
+
+      useEffect(() => { localStorage.setItem('zabbixApiUrl', url); }, [url]);
+      useEffect(() => { localStorage.setItem('zabbixApiToken', token); }, [token]);
+      useEffect(() => { localStorage.setItem('zabbixCustomLogo', customLogo); }, [customLogo]);
+      useEffect(() => { localStorage.setItem('zabbixWatermark', watermarkText); }, [watermarkText]);
+      useEffect(() => { localStorage.setItem('zabbixGraphSize', graphSize); }, [graphSize]);
+
+      // 커스텀 알림 모달 상태
+      const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'alert', title: '', message: '', onConfirm: null });
+      const [isTokenHelpOpen, setIsTokenHelpOpen] = useState(false);
+
+      const showAlert = (title, message, type = 'alert') => setModalConfig({ isOpen: true, type, title, message, onConfirm: null });
+      const showConfirm = (title, message, onConfirm) => setModalConfig({ isOpen: true, type: 'confirm', title, message, onConfirm });
+      const closeModal = () => setModalConfig({ ...modalConfig, isOpen: false });
+
+      const ITEMS_PER_PAGE_TABLE = 10;
+      const getItemsPerPageGrid = () => {
+        if (graphSize === 'small') return 8;
+        if (graphSize === 'large') return 3;
+        return 6;
+      };
+
+      const [hostPage, setHostPage] = useState(1);
+      const [problemPage, setProblemPage] = useState(1);
+      const [itemPage, setItemPage] = useState(1);
+
+      const [hostStatusFilter, setHostStatusFilter] = useState('ALL');
+      const [hostGroupFilter, setHostGroupFilter] = useState('ALL');
+      const [itemHostFilter, setItemHostFilter] = useState('ALL');
+      const [problemSeverityFilters, setProblemSeverityFilters] = useState(['ALL']);
+      const [problemHostFilter, setProblemHostFilter] = useState('ALL');
+      const [problemGroupFilter, setProblemGroupFilter] = useState('ALL');
+
+      const [showSectionAnalysis, setShowSectionAnalysis] = useState(true);
+      const [includeAnalysisInPdf, setIncludeAnalysisInPdf] = useState(true);
+
+      // 스마트 분석 섹션의 개별 항목 표출 상태
+      const [showAnalysisUptime, setShowAnalysisUptime] = useState(true);
+      const [showAnalysisOffenders, setShowAnalysisOffenders] = useState(true);
+      const [showAnalysisStorage, setShowAnalysisStorage] = useState(true);
+      const [showAnalysisCpu, setShowAnalysisCpu] = useState(true);
+      const [showAnalysisMemory, setShowAnalysisMemory] = useState(true);
+      const [showAnalysisSpikes, setShowAnalysisSpikes] = useState(true);
+      const [showAnalysisNetwork, setShowAnalysisNetwork] = useState(true);
+
+      const [showSectionHosts, setShowSectionHosts] = useState(true);
+      const [showSectionProblems, setShowSectionProblems] = useState(true);
+      const [showSectionItems, setShowSectionItems] = useState(true);
+      const [isViewSettingsOpen, setIsViewSettingsOpen] = useState(false);
+
+      const fileInputRef = useRef(null);
+      const logoInputRef = useRef(null);
+
+      // PDF 변환 라이브러리 동적 로드
+      useEffect(() => {
+        const loadScriptWithFallback = (cdnSrc, localSrc, id, globalVar) => {
+          return new Promise((resolve, reject) => {
+            if (window[globalVar]) { resolve(); return; }
+            const fallbackToLocal = () => {
+              const fallbackScript = document.createElement('script');
+              fallbackScript.id = id + '-local';
+              fallbackScript.src = localSrc;
+              fallbackScript.onload = () => { if (window[globalVar]) resolve(); else reject(); };
+              fallbackScript.onerror = reject;
+              document.head.appendChild(fallbackScript);
+            };
+            const script = document.createElement('script');
+            script.id = id; script.src = cdnSrc;
+            script.onload = () => { if (window[globalVar]) resolve(); else fallbackToLocal(); };
+            script.onerror = fallbackToLocal;
+            document.head.appendChild(script);
+          });
+        };
+
+        Promise.all([
+          loadScriptWithFallback('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', './assets/js/html2canvas.min.js', 'html2canvas-script', 'html2canvas'),
+          loadScriptWithFallback('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', './assets/js/jspdf.umd.min.js', 'jspdf-script', 'jspdf')
+        ]).then(() => setScriptsLoaded(true))
+          .catch(err => {
+            setError("PDF 변환 라이브러리 로드 실패. Zabbix 서버의 assets/js 폴더를 확인해주세요.");
+            showAlert("라이브러리 누락", "오프라인 모드용 라이브러리 파일을 찾을 수 없습니다.", "alert");
+          });
+      }, []);
+
+      useEffect(() => setHostPage(1), [hostsData, hostStatusFilter, hostGroupFilter]);
+      useEffect(() => setProblemPage(1), [problemsData, problemSeverityFilters, problemHostFilter, problemGroupFilter]);
+      useEffect(() => setItemPage(1), [itemsData, itemHostFilter, graphSize]);
+
+      const callZabbixApi = async (method, params) => {
+        try {
+          const response = await fetch(url, {
+            method: 'POST', headers: { 'Content-Type': 'application/json-rpc' },
+            body: JSON.stringify({ jsonrpc: '2.0', method: method, params: params, id: Math.floor(Math.random() * 10000), auth: token })
+          });
+
+          if (!response.ok) {
+            showAlert('서버 연결 실패', `HTTP ${response.status}\nZabbix API URL 또는 토큰을 확인해주세요.`, 'alert');
+            throw new Error('Server connection failed');
+          }
+
+          const result = await response.json();
+          if (result.error) {
+            const errData = String(result.error.data || '').toLowerCase();
+            if (errData.includes('auth') || errData.includes('session') || errData.includes('token')) {
+              showAlert('API 토큰 만료', 'API 토큰 유효기간이 지났거나 잘못되었습니다.\n새로운 토큰을 기입해주세요.', 'alert');
+            } else {
+              showAlert('API 호출 오류', result.error.data || result.error.message, 'alert');
+            }
+            throw new Error(result.error.message);
+          }
+          return result.result;
+        } catch (err) {
+          if (err.message === 'Failed to fetch') {
+            showAlert('통신 실패 (CORS 차단)', '서버 주소(http://...)로 접속했는지, URL 끝에 /api_jsonrpc.php 가 있는지 확인해주세요.', 'alert');
+          }
+          throw err;
+        }
+      };
+
+      const getItemId = (item) => item.hostid || item.eventid || item.itemid;
+
+      const mapTriggerGroups = async (problemsArray) => {
+        if (!problemsArray || problemsArray.length === 0) return problemsArray;
+        const triggerIds = problemsArray.filter(p => String(p.source) === '0' && String(p.object) === '0').map(p => p.objectid);
+        if (triggerIds.length === 0) return problemsArray;
+
+        const triggersRes = await callZabbixApi('trigger.get', { triggerids: triggerIds, selectHosts: ['hostid', 'name'] });
+        const hostIds = [...new Set(triggersRes.flatMap(t => t.hosts.map(h => h.hostid)))];
+        let hostGroupMap = {};
+
+        if (hostIds.length > 0) {
+          const hRes = await callZabbixApi('host.get', { hostids: hostIds, selectHostGroups: ['name'] });
+          hRes.forEach(h => { hostGroupMap[h.hostid] = h.hostgroups || []; });
+        }
+
+        const triggerMap = {};
+        triggersRes.forEach(t => { triggerMap[t.triggerid] = t.hosts; });
+
+        return problemsArray.map(p => {
+          const mHosts = triggerMap[p.objectid] || [];
+          const mGroups = [];
+          mHosts.forEach(h => {
+            const hg = hostGroupMap[h.hostid] || [];
+            hg.forEach(g => mGroups.push(g));
+          });
+          return { ...p, hosts: mHosts, groups: mGroups };
+        });
+      };
+
+      const fetchItemsWithHistory = async (timeFrom, timeTill) => {
+        const items = await callZabbixApi('item.get', {
+          output: ['itemid', 'name', 'lastvalue', 'units', 'lastclock', 'value_type'],
+          selectHosts: ['name', 'host'],
+          monitored: true,
+          search: { value_type: ['0', '3'] },
+          limit: 300
+        });
+
+        if (!items || items.length === 0) return [];
+
+        let historyParams = { output: 'extend', sortfield: 'clock', sortorder: 'ASC', limit: 1000 };
+        if (timeFrom) historyParams.time_from = timeFrom;
+        else historyParams.time_from = Math.floor(Date.now() / 1000) - (86400 * 7);
+        if (timeTill) historyParams.time_till = timeTill;
+
+        const floatItemIds = items.filter(i => i.value_type === '0').map(i => i.itemid);
+        const uintItemIds = items.filter(i => i.value_type === '3').map(i => i.itemid);
+
+        let historyData = [];
+        if (floatItemIds.length > 0) historyData = historyData.concat(await callZabbixApi('history.get', { ...historyParams, history: 0, itemids: floatItemIds }));
+        if (uintItemIds.length > 0) historyData = historyData.concat(await callZabbixApi('history.get', { ...historyParams, history: 3, itemids: uintItemIds }));
+
+        return items.map(item => ({
+          ...item,
+          history: historyData.filter(h => h.itemid === item.itemid)
+        }));
+      };
+
+      const fetchAllDashboard = async () => {
+        if (!url || !token) { showAlert('입력 확인', 'Zabbix API URL과 Token을 모두 입력해주세요.', 'info'); return; }
+        setLoading(true); setError(''); setDataType('dashboard');
+        const timeFrom = startDate ? Math.floor(new Date(startDate).getTime() / 1000) : undefined;
+        const timeTill = endDate ? Math.floor(new Date(endDate).getTime() / 1000) : undefined;
+
+        try {
+          const hostsPromise = callZabbixApi('host.get', { output: ['hostid', 'host', 'name', 'status', 'available', 'description'], selectInterfaces: ['interfaceid', 'ip', 'type', 'available', 'error'], selectHostGroups: ['groupid', 'name'] });
+          const problemsPromise = callZabbixApi('problem.get', { output: 'extend', sortfield: ['eventid'], sortorder: 'DESC', limit: 100, recent: (!startDate && !endDate) ? true : undefined, time_from: timeFrom, time_till: timeTill });
+          const itemsPromise = fetchItemsWithHistory(timeFrom, timeTill);
+
+          let [hostsRes, problemsRes, itemsRes] = await Promise.all([hostsPromise, problemsPromise, itemsPromise]);
+          problemsRes = await mapTriggerGroups(problemsRes);
+
+          setHostsData(hostsRes); setProblemsData(problemsRes); setItemsData(itemsRes);
+          setSelectedIds([...hostsRes, ...problemsRes, ...itemsRes].map(getItemId));
+        } catch (err) { setError('대시보드 로딩 실패'); } finally { setLoading(false); }
+      };
+
+      const fetchHosts = async () => {
+        if (!url || !token) { showAlert('입력 확인', 'Zabbix API URL과 Token을 모두 입력해주세요.', 'info'); return; }
+        setLoading(true); setError(''); setDataType('hosts');
+        try {
+          const res = await callZabbixApi('host.get', { output: ['hostid', 'host', 'name', 'status', 'available', 'description'], selectInterfaces: ['interfaceid', 'ip', 'type', 'available', 'error'], selectHostGroups: ['groupid', 'name'] });
+          setHostsData(res); setSelectedIds(res.map(getItemId));
+        } catch (err) { } finally { setLoading(false); }
+      };
+
+      const fetchProblems = async () => {
+        if (!url || !token) { showAlert('입력 확인', 'Zabbix API URL과 Token을 모두 입력해주세요.', 'info'); return; }
+        setLoading(true); setError(''); setDataType('problems');
+        const timeFrom = startDate ? Math.floor(new Date(startDate).getTime() / 1000) : undefined;
+        const timeTill = endDate ? Math.floor(new Date(endDate).getTime() / 1000) : undefined;
+        try {
+          let res = await callZabbixApi('problem.get', { output: 'extend', sortfield: ['eventid'], sortorder: 'DESC', limit: 150, time_from: timeFrom, time_till: timeTill, recent: (!startDate && !endDate) ? true : undefined });
+          res = await mapTriggerGroups(res);
+          setProblemsData(res); setSelectedIds(res.map(getItemId));
+        } catch (err) { } finally { setLoading(false); }
+      };
+
+      const fetchItems = async () => {
+        if (!url || !token) { showAlert('입력 확인', 'Zabbix API URL과 Token을 모두 입력해주세요.', 'info'); return; }
+        setLoading(true); setError(''); setDataType('items');
+        const timeFrom = startDate ? Math.floor(new Date(startDate).getTime() / 1000) : undefined;
+        const timeTill = endDate ? Math.floor(new Date(endDate).getTime() / 1000) : undefined;
+        try {
+          const items = await fetchItemsWithHistory(timeFrom, timeTill);
+          setItemsData(items); setSelectedIds(items.map(getItemId));
+        } catch (err) { } finally { setLoading(false); }
+      };
+
+      const loadMockData = (type) => {
+        setLoading(true); setError(''); setDataType(type);
+        setTimeout(() => {
+          const genHistory = (base, variance, trend = 0, count = 30) => {
+            let arr = []; let now = Math.floor(Date.now() / 1000);
+            for (let i = count; i >= 0; i--) arr.push({ clock: now - (i * 86400), value: base + (Math.random() * variance - (variance / 2)) + ((count - i) * trend) });
+            return arr;
+          };
+
+          const mockHosts = [
+            { hostid: '1', name: 'Zabbix Server', host: 'Zabbix server', status: '0', available: '1', hostgroups: [{ name: 'Zabbix servers' }], interfaces: [{ ip: '127.0.0.1', type: '1', available: '1' }] },
+            { hostid: '2', name: 'Web Server 01', host: 'web-prod-01', status: '0', available: '1', hostgroups: [{ name: 'Linux servers' }, { name: 'Web' }], interfaces: [{ ip: '192.168.1.10', type: '1', available: '1' }] },
+            { hostid: '3', name: 'WORKSTATION', host: 'workstation-01', status: '0', available: '2', hostgroups: [{ name: 'Windows servers' }], interfaces: [{ ip: '192.168.1.120', type: '1', available: '2', error: 'Agent timeout' }] },
+            { hostid: '4', name: 'DB Server 01', host: 'db-prod-01', status: '0', available: '1', hostgroups: [{ name: 'Database' }], interfaces: [{ ip: '10.0.0.5', type: '1', available: '1' }] },
+            ...Array.from({ length: 12 }).map((_, i) => ({ hostid: `10${i}`, name: `Dummy Host ${i}`, host: `dummy-${i}`, status: '0', available: '1', hostgroups: [{ name: 'Dummy Group' }], interfaces: [{ ip: `10.0.0.${i}`, type: '1', available: '1' }] }))
+          ];
+          const mockProblems = [
+            { eventid: '1', name: 'High CPU utilization (over 90% for 5m)', severity: '4', clock: Math.floor(Date.now() / 1000) - 3600, hosts: [{ name: 'Web Server 01' }], groups: [{ name: 'Linux servers' }] },
+            { eventid: '2', name: 'Service is down', severity: '5', clock: Math.floor(Date.now() / 1000) - 1800, hosts: [{ name: 'DB Server 01' }], groups: [{ name: 'DB' }] },
+            { eventid: '3', name: 'Zabbix agent not reachable', severity: '3', clock: Math.floor(Date.now() / 1000) - 7200, hosts: [{ name: 'WORKSTATION' }], groups: [{ name: 'Windows servers' }] },
+            { eventid: '4', name: 'Disk space is critically low', severity: '4', clock: Math.floor(Date.now() / 1000) - 86000, hosts: [{ name: 'Web Server 01' }], groups: [{ name: 'Linux servers' }] },
+            { eventid: '5', name: 'High memory utilization', severity: '3', clock: Math.floor(Date.now() / 1000) - 10000, hosts: [{ name: 'DB Server 01' }], groups: [{ name: 'DB' }] },
+            ...Array.from({ length: 10 }).map((_, i) => ({ eventid: `20${i}`, name: `Minor issue ${i}`, severity: '2', clock: Math.floor(Date.now() / 1000) - 20000, hosts: [{ name: `Dummy Host ${i}` }], groups: [{ name: 'Dummy Group' }] }))
+          ];
+          const mockItems = [
+            { itemid: '101', hosts: [{ name: 'Web Server 01' }], name: 'CPU utilization', lastvalue: '85.4', units: '%', lastclock: Math.floor(Date.now() / 1000), isMock: true, history: genHistory(40, 10, 1.5) },
+            { itemid: '1012', hosts: [{ name: 'DB Server 01' }], name: 'CPU utilization', lastvalue: '92.1', units: '%', lastclock: Math.floor(Date.now() / 1000), isMock: true, history: genHistory(90, 5) },
+            { itemid: '102', hosts: [{ name: 'Web Server 01' }], name: 'Memory Usage', lastvalue: '65.2', units: '%', lastclock: Math.floor(Date.now() / 1000), isMock: true, history: genHistory(65, 5) },
+            { itemid: '1022', hosts: [{ name: 'DB Server 01' }], name: 'Memory utilization', lastvalue: '89.5', units: '%', lastclock: Math.floor(Date.now() / 1000), isMock: true, history: genHistory(89, 2) },
+            { itemid: '105', hosts: [{ name: 'File Server' }], name: '/data: Space utilization', lastvalue: '76.5', units: '%', lastclock: Math.floor(Date.now() / 1000), isMock: true, history: genHistory(60, 1, 0.55) },
+            { itemid: '106', hosts: [{ name: 'Web Server 01' }], name: '/: Space utilization', lastvalue: '42.1', units: '%', lastclock: Math.floor(Date.now() / 1000), isMock: true, history: genHistory(42, 2, 0) },
+            { itemid: '108', hosts: [{ name: 'Web Server 01' }], name: 'Interface eth0: Bits received', lastvalue: '12428800', units: 'bps', lastclock: Math.floor(Date.now() / 1000), isMock: true, history: genHistory(10000000, 2000000) },
+            { itemid: '109', hosts: [{ name: 'DB Server 01' }], name: 'Interface eth1: Bits sent', lastvalue: '804857600', units: 'bps', lastclock: Math.floor(Date.now() / 1000), isMock: true, history: genHistory(800000000, 50000000) },
+            ...Array.from({ length: 5 }).map((_, i) => ({ itemid: `30${i}`, hosts: [{ name: 'Dummy Server' }], name: `Metric ${i}`, lastvalue: '50', units: '%', lastclock: Math.floor(Date.now() / 1000), isMock: true, history: [] }))
+          ];
+
+          if (type === 'dashboard') {
+            setHostsData(mockHosts); setProblemsData(mockProblems); setItemsData(mockItems);
+            setSelectedIds([...mockHosts, ...mockProblems, ...mockItems].map(getItemId));
+          } else if (type === 'hosts') {
+            setHostsData(mockHosts); setSelectedIds(mockHosts.map(getItemId));
+          } else if (type === 'problems') {
+            setProblemsData(mockProblems); setSelectedIds(mockProblems.map(getItemId));
+          } else if (type === 'items') { setItemsData(mockItems); setSelectedIds(mockItems.map(getItemId)); }
+          setLoading(false);
+        }, 500);
+      };
+
+      const getCurrentData = () => {
+        let data = [];
+        if (dataType === 'dashboard') {
+          if (showSectionHosts) data = [...data, ...hostsData];
+          if (showSectionProblems) data = [...data, ...problemsData];
+          if (showSectionItems) data = [...data, ...itemsData];
+        } else {
+          if (dataType === 'hosts' && showSectionHosts) data = hostsData;
+          if (dataType === 'problems' && showSectionProblems) data = problemsData;
+          if (dataType === 'items' && showSectionItems) data = itemsData;
+        }
+        return data;
+      };
+
+      const currentTotalData = getCurrentData();
+
+      const toggleProblemSeverity = (val) => {
+        if (val === 'ALL') {
+          setProblemSeverityFilters(['ALL']);
+        } else {
+          setProblemSeverityFilters(prev => {
+            let next = prev.filter(v => v !== 'ALL');
+            if (next.includes(val)) next = next.filter(v => v !== val);
+            else next = [...next, val];
+            if (next.length === 0) return ['ALL'];
+            return next;
+          });
+        }
+      };
+
+      const toggleSelection = (id) => setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+
+      const toggleAll = (arrToToggle) => {
+        if (!arrToToggle || arrToToggle.length === 0) return;
+        const ids = arrToToggle.map(getItemId);
+        const allSelected = ids.every(id => selectedIds.includes(id));
+        if (allSelected) { setSelectedIds(prev => prev.filter(id => !ids.includes(id))); }
+        else { setSelectedIds(prev => Array.from(new Set([...prev, ...ids]))); }
+      };
+
+      const toggleAllGlobal = () => toggleAll(currentTotalData);
+
+      const handleExportProfile = () => {
+        const profile = {
+          url, token, startDate, endDate,
+          showSectionAnalysis, showAnalysisUptime, showAnalysisOffenders, showAnalysisStorage, showAnalysisCpu, showAnalysisMemory, showAnalysisSpikes, showAnalysisNetwork,
+          showSectionHosts, showSectionProblems, showSectionItems, customLogo, watermarkText, graphSize
+        };
+        const blob = new Blob([JSON.stringify(profile, null, 2)], { type: 'application/json' });
+        const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'zabbix_report_profile.json'; link.click();
+        showAlert('프로필 저장', '설정 파일(JSON) 다운로드가 완료되었습니다.', 'info');
+      };
+
+      const handleImportProfile = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            const profile = JSON.parse(evt.target.result);
+            if (profile.url) setUrl(profile.url);
+            if (profile.token) setToken(profile.token);
+            if (profile.startDate !== undefined) setStartDate(profile.startDate);
+            if (profile.endDate !== undefined) setEndDate(profile.endDate);
+            if (profile.showSectionAnalysis !== undefined) setShowSectionAnalysis(profile.showSectionAnalysis);
+
+            if (profile.showAnalysisUptime !== undefined) setShowAnalysisUptime(profile.showAnalysisUptime);
+            if (profile.showAnalysisOffenders !== undefined) setShowAnalysisOffenders(profile.showAnalysisOffenders);
+            if (profile.showAnalysisStorage !== undefined) setShowAnalysisStorage(profile.showAnalysisStorage);
+            if (profile.showAnalysisCpu !== undefined) setShowAnalysisCpu(profile.showAnalysisCpu);
+            if (profile.showAnalysisMemory !== undefined) setShowAnalysisMemory(profile.showAnalysisMemory);
+            if (profile.showAnalysisSpikes !== undefined) setShowAnalysisSpikes(profile.showAnalysisSpikes);
+            if (profile.showAnalysisNetwork !== undefined) setShowAnalysisNetwork(profile.showAnalysisNetwork);
+
+            if (profile.showSectionHosts !== undefined) setShowSectionHosts(profile.showSectionHosts);
+            if (profile.showSectionProblems !== undefined) setShowSectionProblems(profile.showSectionProblems);
+            if (profile.showSectionItems !== undefined) setShowSectionItems(profile.showSectionItems);
+
+            if (profile.customLogo !== undefined) { setCustomLogo(profile.customLogo); setDraftCustomLogo(profile.customLogo); }
+            if (profile.watermarkText !== undefined) { setWatermarkText(profile.watermarkText); setDraftWatermarkText(profile.watermarkText); }
+            if (profile.graphSize) { setGraphSize(profile.graphSize); setDraftGraphSize(profile.graphSize); }
+
+            showAlert('프로필 불러오기', '설정이 성공적으로 적용되었습니다.', 'info');
+          } catch (err) { showAlert('프로필 오류', '잘못된 형식의 JSON 파일입니다.', 'alert'); }
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+      };
+
+      const handleLogoUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => setDraftCustomLogo(evt.target.result);
+        reader.readAsDataURL(file);
+        e.target.value = '';
+      };
+
+      const handleSaveAdvancedSettings = () => {
+        setCustomLogo(draftCustomLogo); setWatermarkText(draftWatermarkText); setGraphSize(draftGraphSize);
+        showAlert('고급 설정 저장', '보고서 고급 설정이 적용되었습니다.', 'info');
+      };
+
+      const exportPDF = async () => {
+        if (!scriptsLoaded) return;
+        if (currentTotalData.length === 0) { showAlert('추출 오류', '추출할 데이터가 없습니다.', 'alert'); return; }
+        const wasEmptySelection = selectedIds.length === 0;
+        const targetIds = wasEmptySelection ? currentTotalData.map(getItemId) : selectedIds;
+        if (targetIds.length > 150) showConfirm('대량 데이터 추출 경고', '선택된 항목이 매우 많습니다. 브라우저 메모리가 초과될 수 있습니다.\n그래도 진행하시겠습니까?', () => executeExport(targetIds, wasEmptySelection));
+        else executeExport(targetIds, wasEmptySelection);
+      };
+
+      const executeExport = async (targetIds, wasEmptySelection) => {
+        if (wasEmptySelection) setSelectedIds(targetIds);
+        try {
+          setLoading(true); setError(''); setIsExporting(true);
+          window.scrollTo(0, 0);
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          const pages = document.querySelectorAll('.pdf-page');
+          if (!pages || pages.length === 0) throw new Error("렌더링된 페이지를 찾을 수 없습니다.");
+          const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4');
+
+          for (let i = 0; i < pages.length; i++) {
+            const canvas = await window.html2canvas(pages[i], { scale: 1.5, useCORS: true, logging: false, backgroundColor: '#ffffff', scrollY: 0, windowWidth: 1000 });
+            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+            if (i > 0) pdf.addPage();
+            pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+          }
+
+          const dateStr = new Date().toISOString().slice(0, 10);
+          pdf.save(`Zabbix_Report_${dataType}_${dateStr}.pdf`);
+        } catch (err) { showAlert('PDF 생성 오류', `상세 원인: ${err.message || err}`, 'alert'); }
+        finally { setIsExporting(false); setLoading(false); if (wasEmptySelection) setSelectedIds([]); }
+      };
+
+      const getSeverityColor = (severity) => {
+        const colors = { '0': 'bg-gray-100 text-gray-800', '1': 'bg-blue-100 text-blue-800', '2': 'bg-yellow-100 text-yellow-800', '3': 'bg-orange-100 text-orange-800', '4': 'bg-red-100 text-red-800', '5': 'bg-red-600 text-white' };
+        return colors[severity] || colors['0'];
+      };
+      const getSeverityText = (severity) => ['미분류', '정보', '경고', '평균', '높음', '심각'][parseInt(severity) || 0];
+
+      const severityOptions = [
+        { value: 0, label: '미분류', colorClass: 'bg-gray-100 text-gray-800 border-gray-200' }, { value: 1, label: '정보', colorClass: 'bg-blue-100 text-blue-800 border-blue-200' },
+        { value: 2, label: '경고', colorClass: 'bg-yellow-100 text-yellow-800 border-yellow-200' }, { value: 3, label: '평균', colorClass: 'bg-orange-100 text-orange-800 border-orange-200' },
+        { value: 4, label: '높음', colorClass: 'bg-red-100 text-red-800 border-red-200' }, { value: 5, label: '심각', colorClass: 'bg-red-600 text-white border-red-700' }
+      ];
+
+      const formatItemValue = (item) => {
+        let formattedValue = item.lastvalue;
+        const units = item.units ? item.units.toLowerCase() : '';
+        const val = parseFloat(item.lastvalue);
+        if (isNaN(val)) return formattedValue + (item.units ? ` ${item.units}` : '');
+
+        if (units === 'b') {
+          if (val > 1073741824) formattedValue = (val / 1073741824).toFixed(2) + ' GB';
+          else if (val > 1048576) formattedValue = (val / 1048576).toFixed(2) + ' MB';
+          else formattedValue = val + ' B';
+        } else if (units === 'bps') {
+          if (val > 1000000000) formattedValue = (val / 1000000000).toFixed(2) + ' Gbps';
+          else if (val > 1000000) formattedValue = (val / 1000000).toFixed(2) + ' Mbps';
+          else if (val > 1000) formattedValue = (val / 1000).toFixed(2) + ' Kbps';
+          else formattedValue = val.toFixed(2) + ' bps';
+        } else {
+          formattedValue = val.toFixed(2);
+          if (item.units) formattedValue += ` ${item.units}`;
+        }
+        return formattedValue;
+      };
+
+      const getHostStatusInfo = (item) => {
+        if (String(item.status) === '1') return 'DISABLED';
+        if (item.interfaces && item.interfaces.length > 0) {
+          if (item.interfaces.find(inf => String(inf.available) === '2')) return 'ERROR';
+          if (item.interfaces.find(inf => String(inf.available) === '1')) return 'NORMAL';
+        }
+        if (String(item.available) === '2') return 'ERROR';
+        if (String(item.available) === '1') return 'NORMAL';
+        return 'UNKNOWN';
+      };
+
+      const renderPagination = (currentPage, totalItems, setPage, itemsPerPage) => {
+        const totalPages = Math.ceil(totalItems / itemsPerPage);
+        if (totalPages <= 1) return null;
+        return (
+          <div className="flex justify-center items-center p-4 bg-gray-50 border-t border-gray-200">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-4 py-1.5 text-sm bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">이전</button>
+            <span className="px-4 text-sm text-gray-700 font-medium">{currentPage} <span className="text-gray-400 font-normal">/ {totalPages}</span></span>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-4 py-1.5 text-sm bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">다음</button>
+          </div>
+        );
+      };
+
+      // -------------------------------------------------------------
+      // ★ 인프라 7대 분석 요약 (AI 스마트 분석) 데이터 생성
+      // -------------------------------------------------------------
+      const getAnalysisData = () => {
+        const unselectedHostNames = hostsData.length > 0
+          ? hostsData.filter(h => !selectedIds.includes(getItemId(h))).map(h => h.name)
+          : [];
+
+        const activeItems = itemsData.filter(item => {
+          const hostName = item.hosts?.[0]?.name;
+          return selectedIds.includes(getItemId(item)) && !unselectedHostNames.includes(hostName);
+        });
+
+        const activeProblems = problemsData.filter(item => {
+          const hostName = item.hosts?.[0]?.name;
+          return selectedIds.includes(getItemId(item)) && !unselectedHostNames.includes(hostName);
+        });
+
+        const activeHosts = hostsData.filter(item => selectedIds.includes(getItemId(item)));
+
+        const hostsMap = new Map();
+        activeItems.forEach(item => {
+          const hostName = item.hosts?.[0]?.name || 'Unknown Host';
+          if (!hostsMap.has(hostName)) hostsMap.set(hostName, { hostName, cpuItem: null, memItem: null, cpuVal: 0, memVal: 0 });
+          const isCpu = item.name.toLowerCase().match(/cpu.*(utilization|usage)|processor load/i) && item.units === '%';
+          const isMem = item.name.toLowerCase().match(/memory.*(utilization|usage)|ram.*usage/i) && item.units === '%';
+          if (isCpu) {
+            const val = getAverageValue(item);
+            if (val >= hostsMap.get(hostName).cpuVal) { hostsMap.get(hostName).cpuItem = item; hostsMap.get(hostName).cpuVal = val; }
+          } else if (isMem) {
+            const val = getAverageValue(item);
+            if (val >= hostsMap.get(hostName).memVal) { hostsMap.get(hostName).memItem = item; hostsMap.get(hostName).memVal = val; }
+          }
+        });
+        const combinedTopItems = Array.from(hostsMap.values()).filter(h => h.cpuItem || h.memItem).sort((a, b) => b.cpuVal !== a.cpuVal ? b.cpuVal - a.cpuVal : b.memVal - a.memVal).slice(0, 5);
+
+        const storageForecast = activeItems.filter(i => i.name.toLowerCase().match(/(space|vfs|disk).*(utilization|pused)/i) || (i.units === '%' && i.name.toLowerCase().includes('space')))
+          .map(item => ({ ...item, prediction: calculateStoragePrediction(item.history) })).filter(item => item.prediction.status !== 'insufficient')
+          .sort((a, b) => {
+            if (a.prediction.status === 'critical' && b.prediction.status !== 'critical') return -1;
+            if (b.prediction.status === 'critical' && a.prediction.status !== 'critical') return 1;
+            if (a.prediction.status === 'warning' && b.prediction.status === 'warning') return a.prediction.daysLeft - b.prediction.daysLeft;
+            return parseFloat(b.lastvalue) - parseFloat(a.lastvalue);
+          }).slice(0, 5);
+
+        // ★ [로직 개선] 급증(Spike) 감지 조건 엄격화
+        const spikes = activeItems.map(item => {
+          if (!item.history || item.history.length < 2) return null;
+          const isPercent = item.units === '%';
+          const hist = [...item.history].sort((a, b) => parseInt(a.clock) - parseInt(b.clock));
+          const first = parseFloat(hist[0].value);
+          const last = parseFloat(hist[hist.length - 1].value);
+          if (isNaN(first) || isNaN(last)) return null;
+
+          const delta = last - first;
+          if (delta <= 0) return null; // 감소하거나 동일한 경우 제외
+
+          let deltaPercent = 0;
+          if (isPercent) {
+            deltaPercent = delta; // % 항목은 포인트(%p) 증가량 자체를 사용
+            if (deltaPercent < 10) return null; // 10%p 이상 증가해야 유의미한 급증으로 판별
+          } else {
+            if (first <= 1) return null; // 시작값이 너무 작으면 미세 변동도 과장되므로 제외
+            deltaPercent = (delta / first) * 100;
+            if (deltaPercent < 30) return null; // 30% 이상 증가해야 유의미한 급증으로 판별
+          }
+
+          return { ...item, deltaPercent, lastVal: last, firstVal: first, isPercent };
+        }).filter(Boolean)
+          .sort((a, b) => b.deltaPercent - a.deltaPercent).slice(0, 5);
+
+        // ★ [로직 개선] 네트워크 과부하 기준 강화
+        const networkTop = activeItems.filter(i => i.units.toLowerCase().includes('bps') || i.name.toLowerCase().match(/traffic|net\.if|인바운드|아웃바운드/i))
+          .map(i => ({ ...i, avgValue: getAverageValue(i) }))
+          .filter(i => i.avgValue > 1000) // 최소 1Kbps(1000bps) 초과 데이터만 표시 (0bps 등 무의미한 노드 제외)
+          .sort((a, b) => b.avgValue - a.avgValue).slice(0, 5);
+
+        const problemCount = {};
+        activeProblems.forEach(p => {
+          const hName = p.hosts?.[0]?.name || 'Unknown Host';
+          problemCount[hName] = (problemCount[hName] || 0) + 1;
+        });
+        const topOffenders = Object.entries(problemCount).map(([host, count]) => ({ host, count })).sort((a, b) => b.count - a.count).slice(0, 5);
+
+        const totalHostsCount = activeHosts.length;
+        const errorHosts = activeHosts.filter(h => getHostStatusInfo(h) === 'ERROR');
+        const errorCount = errorHosts.length;
+        const sla = totalHostsCount > 0 ? (((totalHostsCount - errorCount) / totalHostsCount) * 100).toFixed(1) : 100;
+
+        return { combinedTopItems, storageForecast, spikes, networkTop, topOffenders, uptime: { total: totalHostsCount, errorCount, errorHosts, sla } };
+      };
+
+      const renderAnalysisSection = (isPdf = false) => {
+        // 모든 세부 항목이 꺼져있다면 섹션 자체를 렌더링하지 않음
+        if (!showAnalysisUptime && !showAnalysisOffenders && !showAnalysisStorage && !showAnalysisCpu && !showAnalysisMemory && !showAnalysisSpikes && !showAnalysisNetwork) return null;
+
+        const { combinedTopItems, storageForecast, spikes, networkTop, topOffenders, uptime } = getAnalysisData();
+
+        const Card = ({ title, icon, children, colSpan = 1, centerContent = false }) => (
+          <div className={`bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col h-full min-h-[380px] ${colSpan > 1 ? `md:col-span-${colSpan}` : ''}`}>
+            <div className="flex items-center mb-4 pb-3 border-b border-gray-100 shrink-0">
+              <div className="p-2.5 bg-gray-50 rounded-lg mr-3">{icon}</div>
+              <h4 className="font-bold text-gray-800 text-base">{title}</h4>
+            </div>
+            <div className={`flex-grow flex flex-col ${centerContent ? 'justify-center' : 'justify-start'}`}>
+              {children}
+            </div>
+          </div>
+        );
+
+        const gridClass = isPdf ? "grid grid-cols-3 gap-6" : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5";
+
+        return (
+          <div className={`mb-10 ${isPdf ? 'pdf-page bg-gray-50 w-[1000px] h-[1414px] p-12 relative flex flex-col justify-start overflow-hidden' : ''}`}>
+            {isPdf && watermarkText && <div className="absolute top-1/2 left-1/2 pointer-events-none z-0 opacity-10" style={{ transform: 'translate(-50%, -50%) rotate(-45deg)' }}><span className="text-[9rem] font-black text-gray-500 whitespace-nowrap">{watermarkText}</span></div>}
+
+            <div className={`flex justify-between items-center ${isPdf ? 'border-b-2 border-gray-800 pb-4 mb-8' : 'p-4 border-b border-gray-200 bg-white rounded-t-xl shrink-0'}`}>
+              <h3 className={`${isPdf ? 'text-3xl' : 'text-xl'} font-bold text-gray-900 flex items-center relative z-10`}>
+                <SparklesIcon className={`${isPdf ? 'w-8 h-8 mr-3' : 'w-5 h-5 mr-2'} text-indigo-600`} />
+                인프라 7대 스마트 분석 <span className={`${isPdf ? 'text-xl ml-4' : 'text-sm ml-2'} font-normal text-gray-400`}>(선택 기간 기반)</span>
+              </h3>
+
+              {!isPdf && (
+                <label className="flex items-center space-x-1.5 cursor-pointer text-sm text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-3 py-1.5 rounded transition">
+                  <input type="checkbox" checked={includeAnalysisInPdf} onChange={() => setIncludeAnalysisInPdf(!includeAnalysisInPdf)} className="w-4 h-4 rounded border-indigo-300 text-indigo-600 cursor-pointer" />
+                  <span className="font-bold">PDF에 포함하기</span>
+                </label>
+              )}
+            </div>
+
+            <div className={`${gridClass} relative z-10 flex-grow content-start ${!isPdf ? 'bg-gray-50/50 p-5 border-x border-b border-gray-200 rounded-b-xl' : ''} ${!isPdf && !includeAnalysisInPdf ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
+
+              {/* 1. Uptime SLA */}
+              {showAnalysisUptime && (
+                <Card title="인프라 가동률 (SLA)" icon={<ShieldCheckIcon className="w-6 h-6 text-green-600" />} centerContent={true}>
+                  <div className="text-center mb-4">
+                    <div className="text-5xl font-black text-green-500 mb-2">{uptime.sla}%</div>
+                    <p className="text-sm text-gray-500">전체 {uptime.total}대 중 {uptime.total - uptime.errorCount}대 정상 가동</p>
+                  </div>
+                  {uptime.errorCount > 0 && (
+                    <div className="mt-2 p-3 bg-red-50 rounded-lg text-xs text-red-700">
+                      <span className="font-bold flex items-center mb-1"><AlertCircle className="w-3 h-3 mr-1" /> 장애 감지 호스트:</span>
+                      <ul className="list-disc pl-5 space-y-0.5">
+                        {uptime.errorHosts.slice(0, 3).map((h, i) => <li key={i}>{h.name}</li>)}
+                        {uptime.errorHosts.length > 3 && <li>외 {uptime.errorHosts.length - 3}대</li>}
+                      </ul>
+                    </div>
+                  )}
+                </Card>
+              )}
+
+              {/* 2. Top Offenders */}
+              {showAnalysisOffenders && (
+                <Card title="요주의 서버 (알람 최다)" icon={<AlertCircle className="w-6 h-6 text-red-500" />}>
+                  {topOffenders.length > 0 ? (
+                    <div className="flex flex-col gap-3">
+                      {topOffenders.map((offender, idx) => (
+                        <div key={idx} className="flex justify-between items-center bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                          <span className="font-bold text-gray-700 text-sm truncate pr-2" title={offender.host}>{idx + 1}. {offender.host}</span>
+                          <span className="px-2.5 py-1 bg-red-100 text-red-700 font-bold rounded-md text-xs shrink-0">{offender.count}건 발생</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (<p className="text-sm text-gray-400 text-center py-4">조회된 문제(알람)가 없습니다.</p>)}
+                </Card>
+              )}
+
+              {/* 3. Storage Forecast */}
+              {showAnalysisStorage && (
+                <Card title="스토리지 포화 임박 예측" icon={<HardDriveIcon className="w-6 h-6 text-orange-500" />}>
+                  {storageForecast.length > 0 ? (
+                    <div className="flex flex-col gap-3">
+                      {storageForecast.map((item, idx) => {
+                        const pred = item.prediction;
+                        let badge = pred.status === 'critical' ? <span className="text-[10px] px-2 py-0.5 bg-red-100 text-red-700 font-bold rounded shrink-0">위험 (80%↑)</span> :
+                          pred.status === 'warning' ? <span className="text-[10px] px-2 py-0.5 bg-orange-100 text-orange-700 font-bold rounded shrink-0">D-{pred.daysLeft} 예상</span> :
+                            <span className="text-[10px] px-2 py-0.5 bg-green-50 text-green-700 font-bold rounded shrink-0">안정적</span>;
+                        return (
+                          <div key={idx} className="bg-gray-50 border border-gray-100 p-2.5 rounded-lg">
+                            <div className="flex justify-between items-center mb-1 gap-2">
+                              <span className="text-xs font-bold text-gray-800 truncate" title={item.hosts?.[0]?.name}>{item.hosts?.[0]?.name}</span>
+                              {badge}
+                            </div>
+                            <div className="flex justify-between items-end gap-2">
+                              <span className="text-[10px] text-gray-500 truncate flex-1 cursor-help" title={item.name}>{item.name}</span>
+                              <span className="text-sm font-black text-gray-700 shrink-0">{pred.current.toFixed(1)}%</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (<p className="text-sm text-gray-400 text-center py-4">예측 가능한 데이터가 부족합니다.</p>)}
+                </Card>
+              )}
+
+              {/* 4. CPU Top 5 */}
+              {showAnalysisCpu && (
+                <Card title="CPU 평균 점유율 Top 5" icon={<CpuIcon className="w-6 h-6 text-blue-600" />}>
+                  {combinedTopItems.some(d => d.cpuItem) ? (
+                    <div className="flex flex-col gap-4 mt-2">
+                      {combinedTopItems.map((data, idx) => {
+                        const val = data.cpuVal; const isHigh = val > 80;
+                        return (
+                          <div key={idx}>
+                            <div className="flex justify-between text-xs mb-1.5 gap-2">
+                              <span className="font-semibold text-gray-700 truncate" title={data.hostName}>{data.hostName}</span>
+                              <span className={`font-bold shrink-0 ${!data.cpuItem ? 'text-gray-400' : isHigh ? 'text-red-600' : 'text-blue-600'}`}>{data.cpuItem ? `${val.toFixed(1)}%` : 'N/A'}</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                              <div className={`h-full ${!data.cpuItem ? 'bg-transparent' : isHigh ? 'bg-red-500' : 'bg-blue-500'}`} style={{ width: `${Math.min(100, val)}%` }}></div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (<p className="text-sm text-gray-400 text-center py-4">CPU 데이터가 없습니다.</p>)}
+                </Card>
+              )}
+
+              {/* 5. Memory Top 5 */}
+              {showAnalysisMemory && (
+                <Card title="메모리 평균 점유율 Top 5" icon={<DatabaseIcon className="w-6 h-6 text-purple-600" />}>
+                  {combinedTopItems.some(d => d.memItem) ? (
+                    <div className="flex flex-col gap-4 mt-2">
+                      {combinedTopItems.map((data, idx) => {
+                        const val = data.memVal; const isHigh = val > 80;
+                        return (
+                          <div key={idx}>
+                            <div className="flex justify-between text-xs mb-1.5 gap-2">
+                              <span className="font-semibold text-gray-700 truncate" title={data.hostName}>{data.hostName}</span>
+                              <span className={`font-bold shrink-0 ${!data.memItem ? 'text-gray-400' : isHigh ? 'text-red-600' : 'text-purple-600'}`}>{data.memItem ? `${val.toFixed(1)}%` : 'N/A'}</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                              <div className={`h-full ${!data.memItem ? 'bg-transparent' : isHigh ? 'bg-red-500' : 'bg-purple-500'}`} style={{ width: `${Math.min(100, val)}%` }}></div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (<p className="text-sm text-gray-400 text-center py-4">메모리 데이터가 없습니다.</p>)}
+                </Card>
+              )}
+
+              {/* 6. Spikes (급증 감지) */}
+              {showAnalysisSpikes && (
+                <Card title="유의미한 사용량 급증 감지" icon={<TrendingUpIcon className="w-6 h-6 text-pink-500" />}>
+                  <p className="text-[10px] text-gray-400 mb-3 border-b border-gray-50 pb-2">단순 미세 변동을 제외한 뚜렷한 상승세 지표</p>
+                  {spikes.length > 0 ? (
+                    <div className="flex flex-col gap-3">
+                      {spikes.map((item, idx) => (
+                        <div key={idx} className="flex flex-col bg-pink-50/50 p-2.5 rounded-lg border border-pink-100">
+                          <div className="flex justify-between items-center mb-1 gap-2">
+                            <span className="font-bold text-gray-800 text-xs truncate" title={item.hosts?.[0]?.name}>{item.hosts?.[0]?.name}</span>
+                            <span className="px-2 py-0.5 bg-pink-100 text-pink-700 font-black rounded text-[10px] shrink-0">+{item.deltaPercent.toFixed(1)}{item.isPercent ? '%p' : '%'} 급증</span>
+                          </div>
+                          <div className="text-[10px] text-gray-500 flex justify-between items-end gap-2">
+                            <span className="truncate flex-1 cursor-help" title={item.name}>{item.name}</span>
+                            <span className="shrink-0">{item.firstVal.toFixed(1)} ➔ <strong className="text-pink-600">{item.lastVal.toFixed(1)}</strong></span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (<p className="text-sm text-gray-400 text-center py-4">급증(Spike) 이상 징후가 없습니다.<br /><span className="text-xs font-normal">(안정적 상태)</span></p>)}
+                </Card>
+              )}
+
+              {/* 7. Network Traffic (PDF에서는 col-span-3 또는 마지막 자리) */}
+              {showAnalysisNetwork && (
+                <Card title="네트워크 트래픽 점유율 Top 5" icon={<GlobeIcon className="w-6 h-6 text-cyan-500" />} colSpan={isPdf ? 3 : 1}>
+                  <p className="text-[10px] text-gray-400 mb-3 border-b border-gray-50 pb-2">선택 기간 내 평균 트래픽 사용량이 가장 높은 노드</p>
+                  {networkTop.length > 0 ? (
+                    <div className={`grid ${isPdf ? 'grid-cols-3' : 'grid-cols-1'} gap-3 mt-1`}>
+                      {networkTop.map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-center bg-cyan-50/30 p-4 rounded-xl border border-cyan-100 gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-bold text-gray-800 text-sm truncate mb-1" title={item.hosts?.[0]?.name}>{item.hosts?.[0]?.name}</div>
+                            <div className="text-xs text-gray-500 truncate cursor-help" title={item.name}>{item.name}</div>
+                          </div>
+                          <div className="text-lg font-black text-cyan-600 ml-3 shrink-0">{formatItemValue({ ...item, lastvalue: item.avgValue })}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (<p className="text-sm text-gray-400 text-center py-4">유의미한 대역폭(1Kbps 초과)을<br />사용 중인 노드가 없습니다.</p>)}
+                </Card>
+              )}
+
+            </div>
+          </div>
+        );
+      };
+
+      // --- 화면 렌더링 함수 복구 (renderHostsWeb, renderProblemsWeb, renderItemsWeb) ---
+      const renderHostsWeb = () => {
+        const baseArr = dataType === 'dashboard' ? hostsData : (dataType === 'hosts' ? hostsData : []);
+        const uniqueHostGroups = Array.from(new Set(hostsData.flatMap(h => h.hostgroups?.map(g => g.name) || []))).sort();
+
+        const filteredArr = baseArr.filter(item => {
+          const statusMatch = hostStatusFilter === 'ALL' || getHostStatusInfo(item) === hostStatusFilter;
+          const groupMatch = hostGroupFilter === 'ALL' || (item.hostgroups && item.hostgroups.some(g => g.name === hostGroupFilter));
+          return statusMatch && groupMatch;
+        });
+
+        const paginatedArr = filteredArr.slice((hostPage - 1) * ITEMS_PER_PAGE_TABLE, hostPage * ITEMS_PER_PAGE_TABLE);
+
+        if (baseArr.length === 0) return null;
+
+        return (
+          <div className="mb-10 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-white shrink-0">
+              <h3 className="text-xl font-bold text-gray-800 flex items-center"><Server className="w-5 h-5 mr-2 text-blue-600" /> 호스트 상태</h3>
+              <div className="flex gap-2">
+                <select value={hostGroupFilter} onChange={(e) => { setHostGroupFilter(e.target.value); setHostPage(1); }} className="text-sm border border-gray-300 rounded-lg p-1.5 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer font-medium bg-gray-50 hover:bg-gray-100 transition max-w-[200px]">
+                  <option value="ALL">그룹: 전체 보기</option>
+                  {uniqueHostGroups.map(group => <option key={group} value={group}>그룹: {group}</option>)}
+                </select>
+                <select value={hostStatusFilter} onChange={(e) => { setHostStatusFilter(e.target.value); setHostPage(1); }} className="text-sm border border-gray-300 rounded-lg p-1.5 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer font-medium bg-gray-50 hover:bg-gray-100 transition">
+                  <option value="ALL">상태: 전체 보기</option><option value="NORMAL">상태: ZBX 정상</option><option value="ERROR">상태: ZBX 오류</option><option value="UNKNOWN">상태: 상태 대기/알 수 없음</option><option value="DISABLED">상태: 비활성</option>
+                </select>
+              </div>
+            </div>
+
+            {filteredArr.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-100 border-b border-gray-300">
+                      <th className="py-3 px-4 w-12 text-center"><input type="checkbox" checked={filteredArr.every(i => selectedIds.includes(getItemId(i)))} onChange={() => toggleAll(filteredArr)} className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer" /></th>
+                      <th className="py-3 px-4 font-semibold text-sm text-gray-700">호스트명</th>
+                      <th className="py-3 px-4 font-semibold text-sm text-gray-700">시스템명</th>
+                      <th className="py-3 px-4 font-semibold text-sm text-gray-700">IP 주소</th>
+                      <th className="py-3 px-4 font-semibold text-sm text-gray-700 text-center">상태</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {paginatedArr.map((item) => {
+                      const id = getItemId(item); const isSelected = selectedIds.includes(id); const infoStatus = getHostStatusInfo(item);
+                      let statusBadge = null;
+                      if (infoStatus === 'DISABLED') statusBadge = <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-500 border border-gray-200 shadow-sm">비활성</span>;
+                      else if (infoStatus === 'NORMAL') statusBadge = <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-200 shadow-sm">ZBX 정상</span>;
+                      else if (infoStatus === 'ERROR') {
+                        const errInf = item.interfaces?.find(inf => String(inf.available) === '2');
+                        statusBadge = <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200 shadow-sm" title={errInf?.error || '연결 오류'}>ZBX 오류</span>;
+                      } else statusBadge = <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-50 text-gray-600 border border-gray-200 shadow-sm">상태 대기</span>;
+                      const displayInterface = item.interfaces?.find(inf => String(inf.available) === '2') || item.interfaces?.find(inf => String(inf.available) === '1') || item.interfaces?.[0];
+                      return (
+                        <tr key={id} className={`hover:bg-gray-50 transition-colors ${!isSelected ? 'opacity-40 grayscale' : ''}`}>
+                          <td className="py-3 px-4 text-center"><input type="checkbox" checked={isSelected} onChange={() => toggleSelection(id)} className="w-4 h-4 cursor-pointer rounded border-gray-300 text-blue-600" /></td>
+                          <td className="py-3 px-4 text-sm font-medium">{item.name}</td>
+                          <td className="py-3 px-4 text-sm text-gray-500">{item.host}</td>
+                          <td className="py-3 px-4 text-sm text-gray-600">{displayInterface?.ip || 'N/A'}</td>
+                          <td className="py-3 px-4 text-sm text-center">{statusBadge}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-8 text-center text-gray-500 bg-gray-50 border-t border-gray-100">조건에 맞는 호스트 데이터가 없습니다.</div>
+            )}
+            {filteredArr.length > 0 && renderPagination(hostPage, filteredArr.length, setHostPage, ITEMS_PER_PAGE_TABLE)}
+          </div>
+        );
+      };
+
+      const renderProblemsWeb = () => {
+        const baseArr = dataType === 'dashboard' ? problemsData : (dataType === 'problems' ? problemsData : []);
+
+        const allHostsSet = new Set();
+        const allGroupsSet = new Set();
+        baseArr.forEach(item => {
+          allHostsSet.add(item.hosts?.[0]?.name || 'Unknown Host');
+          if (item.groups) item.groups.forEach(g => allGroupsSet.add(g.name));
+        });
+        const uniqueHosts = Array.from(allHostsSet).sort();
+        const uniqueGroups = Array.from(allGroupsSet).sort();
+
+        const filteredArr = baseArr.filter(item => {
+          const sevMatch = problemSeverityFilters.includes('ALL') || problemSeverityFilters.includes(String(item.severity));
+          const hostMatch = problemHostFilter === 'ALL' || (item.hosts?.[0]?.name || 'Unknown Host') === problemHostFilter;
+          const groupMatch = problemGroupFilter === 'ALL' || (item.groups && item.groups.some(g => g.name === problemGroupFilter));
+          return sevMatch && hostMatch && groupMatch;
+        });
+
+        const paginatedArr = filteredArr.slice((problemPage - 1) * ITEMS_PER_PAGE_TABLE, problemPage * ITEMS_PER_PAGE_TABLE);
+
+        if (baseArr.length === 0) return null;
+
+        return (
+          <div className="mb-10 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-white shrink-0">
+              <h3 className="text-xl font-bold text-gray-800 flex items-center"><AlertCircle className="w-5 h-5 mr-2 text-red-500" /> 최근 문제(알람)</h3>
+
+              <div className="flex gap-2">
+                <select value={problemGroupFilter} onChange={(e) => { setProblemGroupFilter(e.target.value); setProblemPage(1); }} className="text-sm border border-gray-300 rounded-lg p-1.5 focus:ring-blue-500 outline-none cursor-pointer font-medium bg-gray-50 hover:bg-gray-100 max-w-[160px]">
+                  <option value="ALL">그룹: 전체 보기</option>
+                  {uniqueGroups.map(g => <option key={g} value={g}>그룹: {g}</option>)}
+                </select>
+                <select value={problemHostFilter} onChange={(e) => { setProblemHostFilter(e.target.value); setProblemPage(1); }} className="text-sm border border-gray-300 rounded-lg p-1.5 focus:ring-blue-500 outline-none cursor-pointer font-medium bg-gray-50 hover:bg-gray-100 max-w-[160px]">
+                  <option value="ALL">호스트: 전체 보기</option>
+                  {uniqueHosts.map(h => <option key={h} value={h}>호스트: {h}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row">
+              <div className="w-full md:w-36 shrink-0 flex flex-col gap-2 bg-gray-50 border-r border-gray-200 p-4">
+                <span className="text-xs font-bold text-gray-500 mb-1 border-b border-gray-200 pb-2">심각도 표시 필터</span>
+                <button
+                  onClick={() => toggleProblemSeverity('ALL')}
+                  className={`text-left text-sm px-3 py-2 rounded-lg border transition-all shadow-sm ${problemSeverityFilters.includes('ALL') ? 'bg-gray-800 text-white border-gray-800 font-bold' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'}`}
+                >
+                  전체 보기
+                </button>
+                {severityOptions.map((opt) => {
+                  const isSelected = problemSeverityFilters.includes(String(opt.value));
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => toggleProblemSeverity(String(opt.value))}
+                      className={`text-left text-sm px-3 py-2 rounded-lg border transition-all shadow-sm ${isSelected ? opt.colorClass + ' ring-2 ring-offset-1 font-bold' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'}`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex-1 flex flex-col min-w-0">
+                {filteredArr.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-gray-100 border-b border-gray-300">
+                          <th className="py-3 px-4 w-12 text-center"><input type="checkbox" checked={filteredArr.every(i => selectedIds.includes(getItemId(i)))} onChange={() => toggleAll(filteredArr)} className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer" /></th>
+                          <th className="py-3 px-4 font-semibold text-sm text-gray-700 w-48">발생 시간</th>
+                          <th className="py-3 px-4 font-semibold text-sm text-gray-700 w-32">호스트</th>
+                          <th className="py-3 px-4 font-semibold text-sm text-gray-700 w-24">심각도</th>
+                          <th className="py-3 px-4 font-semibold text-sm text-gray-700">문제 내용</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {paginatedArr.map((item) => {
+                          const id = getItemId(item); const isSelected = selectedIds.includes(id);
+                          return (
+                            <tr key={id} className={`hover:bg-gray-50 transition-colors ${!isSelected ? 'opacity-40 grayscale' : ''}`}>
+                              <td className="py-3 px-4 text-center"><input type="checkbox" checked={isSelected} onChange={() => toggleSelection(id)} className="w-4 h-4 cursor-pointer rounded border-gray-300 text-blue-600" /></td>
+                              <td className="py-3 px-4 text-sm text-gray-600 leading-tight">{new Date(parseInt(item.clock) * 1000).toLocaleDateString('ko-KR')}<br /><span className="text-xs text-gray-400">{new Date(parseInt(item.clock) * 1000).toLocaleTimeString('ko-KR')}</span></td>
+                              <td className="py-3 px-4 text-sm text-gray-700 font-medium">{item.hosts?.[0]?.name || 'N/A'}</td>
+                              <td className="py-3 px-4 text-sm"><span className={`px-2.5 py-1 rounded-md text-xs font-bold shadow-sm ${getSeverityColor(item.severity)}`}>{getSeverityText(item.severity)}</span></td>
+                              <td className="py-3 px-4 text-sm font-medium text-gray-800 break-words" title={item.name}>{item.name}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center text-gray-500 flex-1 flex items-center justify-center">조건에 맞는 알람 데이터가 없습니다.</div>
+                )}
+                {filteredArr.length > 0 && renderPagination(problemPage, filteredArr.length, setProblemPage, ITEMS_PER_PAGE_TABLE)}
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const renderItemsWeb = () => {
+        const baseArr = dataType === 'dashboard' ? itemsData : (dataType === 'items' ? itemsData : []);
+        const allHostsSet = new Set();
+        hostsData.forEach(h => allHostsSet.add(h.name));
+        baseArr.forEach(item => allHostsSet.add(item.hosts?.[0]?.name || 'Unknown Host'));
+        const uniqueHosts = Array.from(allHostsSet).sort();
+
+        const filteredArr = baseArr.filter(item => itemHostFilter === 'ALL' || (item.hosts?.[0]?.name || 'Unknown Host') === itemHostFilter);
+        const paginatedArr = filteredArr.slice((itemPage - 1) * getItemsPerPageGrid(), itemPage * getItemsPerPageGrid());
+
+        if (baseArr.length === 0) return null;
+        const baseUrl = url.replace(/api_jsonrpc\.php.*$/i, '');
+
+        const formatForZabbixGraph = (dtString) => dtString ? dtString.replace('T', ' ') + ':00' : '';
+
+        let gridColsClass = 'md:grid-cols-2';
+        let cardHeightClass = 'h-[360px]';
+        if (graphSize === 'small') { gridColsClass = 'md:grid-cols-3'; cardHeightClass = 'h-[280px]'; }
+        if (graphSize === 'large') { gridColsClass = 'md:grid-cols-1'; cardHeightClass = 'h-[460px]'; }
+
+        return (
+          <div className="mb-10 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-white">
+              <h3 className="text-xl font-bold text-gray-800 flex items-center"><Activity className="w-5 h-5 mr-2 text-green-600" /> 관제 아이템 및 트렌드</h3>
+              <div className="flex items-center gap-2">
+                {filteredArr.length > 0 && (
+                  <label className="flex items-center space-x-1.5 cursor-pointer text-sm text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1.5 rounded transition">
+                    <input type="checkbox" checked={filteredArr.every(i => selectedIds.includes(getItemId(i)))} onChange={() => toggleAll(filteredArr)} className="w-4 h-4 rounded border-blue-300 text-blue-600 cursor-pointer" />
+                    <span className="font-semibold">현재 목록 전체선택</span>
+                  </label>
+                )}
+                <select value={itemHostFilter} onChange={(e) => { setItemHostFilter(e.target.value); setItemPage(1); }} className="text-sm border border-gray-300 rounded-lg p-1.5 focus:ring-blue-500 outline-none cursor-pointer font-medium bg-gray-50 max-w-[200px]"><option value="ALL">호스트: 전체 보기</option>{uniqueHosts.map(host => <option key={host} value={host}>호스트: {host}</option>)}</select>
+              </div>
+            </div>
+
+            {filteredArr.length > 0 ? (
+              <div className="p-6 bg-gray-50/50">
+                <div className={`grid grid-cols-1 ${gridColsClass} gap-6`}>
+                  {paginatedArr.map((item) => {
+                    const id = getItemId(item); const isSelected = selectedIds.includes(id);
+                    let graphUrl = `${baseUrl}chart.php?itemids[0]=${item.itemid}&type=0&width=600&height=150`;
+                    if (startDate && endDate) graphUrl += `&from=${formatForZabbixGraph(startDate)}&to=${formatForZabbixGraph(endDate)}`;
+                    else if (startDate) graphUrl += `&from=${formatForZabbixGraph(startDate)}&to=now`;
+                    else if (endDate) graphUrl += `&from=now-24h&to=${formatForZabbixGraph(endDate)}`;
+                    else graphUrl += `&from=now-24h&to=now`;
+                    if (item.isMock) graphUrl = `https://placehold.co/600x150/f9fafb/3b82f6?text=Zabbix+Graph+(${encodeURIComponent(item.name)})`;
+
+                    return (
+                      <div key={item.itemid} className={`relative bg-white border border-gray-200 rounded-xl p-6 flex flex-col ${cardHeightClass} shadow-sm break-inside-avoid transition-all ${!isSelected ? 'opacity-40 grayscale bg-gray-50' : 'hover:border-blue-300 hover:shadow-md ring-1 ring-blue-300'}`}>
+                        <div className="flex justify-between items-start mb-4 gap-4">
+                          <div className="flex-1 min-w-0 pr-2 pt-1">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider break-words pt-1 pb-1 leading-loose">{item.hosts?.[0]?.name || 'Unknown Host'}</p>
+                            <h3 className="text-xl font-bold text-gray-900 pt-1 pb-2 leading-relaxed break-words" title={item.name}>{item.name}</h3>
+                          </div>
+                          <div className="text-right shrink-0 min-w-max flex flex-col items-end">
+                            <div className="flex items-center gap-2 mb-2">
+                              <p className="text-sm text-gray-500">최신값</p>
+                              <div className="bg-white p-1 rounded shadow-sm border border-gray-200 flex items-center justify-center cursor-pointer hover:bg-gray-50" onClick={() => toggleSelection(id)}>
+                                <input type="checkbox" checked={isSelected} readOnly className="w-5 h-5 cursor-pointer rounded border-gray-300 text-blue-600 pointer-events-none" />
+                              </div>
+                            </div>
+                            <p className="text-2xl font-black text-blue-600 whitespace-nowrap break-keep">{formatItemValue(item)}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex-grow w-full bg-white border border-gray-100 rounded-lg overflow-hidden relative flex justify-center items-center">
+                          <img src={graphUrl} className="w-full h-full object-contain" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+                          <div className="hidden flex-col items-center justify-center p-4 text-center text-sm text-gray-400"><span className="font-bold mb-1">그래프 로드 실패</span><span>자빅스 로그인 상태이거나 CORS를 확인해주세요.</span></div>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-3 text-right">마지막 수집: {new Date(parseInt(item.lastclock) * 1000).toLocaleString('ko-KR')}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="p-8 text-center text-gray-500 bg-gray-50 border-t border-gray-100">조건에 맞는 아이템 데이터가 없습니다.</div>
+            )}
+            {filteredArr.length > 0 && renderPagination(itemPage, filteredArr.length, setItemPage, getItemsPerPageGrid())}
+          </div>
+        );
+      };
+
+      return (
+        <div className="min-h-screen relative bg-gray-50">
+
+          {/* 설정 팝업(모달) 창 */}
+          {isViewSettingsOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setIsViewSettingsOpen(false)}>
+              <div className="bg-white rounded-3xl shadow-2xl p-6 w-[340px] max-w-full m-4" onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-5 border-b border-gray-100 pb-3">
+                  <h3 className="font-bold text-gray-800 text-lg flex items-center">
+                    <Settings className="w-5 h-5 mr-2 text-blue-600" /> 화면 표시 설정
+                  </h3>
+                  <button onClick={() => setIsViewSettingsOpen(false)} className="text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-200 p-1.5 rounded-lg transition-colors">
+                    <XIcon className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="flex items-center space-x-3 cursor-pointer hover:bg-indigo-50 p-3 -mx-3 rounded-xl transition-colors border border-transparent hover:border-indigo-100">
+                    <input type="checkbox" checked={showSectionAnalysis} onChange={() => setShowSectionAnalysis(!showSectionAnalysis)} className="rounded text-indigo-600 focus:ring-indigo-500 w-5 h-5 cursor-pointer" />
+                    <span className="text-sm text-gray-800 font-bold select-none">스마트 인프라 분석 표출</span>
+                  </label>
+
+                  {/* ★ [신규 기능] 7대 분석 항목별 개별 스위치 */}
+                  {showSectionAnalysis && (
+                    <div className="ml-8 space-y-2.5 mt-1 mb-4 border-l-2 border-indigo-100 pl-4 py-1">
+                      {[
+                        { id: 'uptime', label: '인프라 가동률 (SLA)', state: showAnalysisUptime, setter: setShowAnalysisUptime },
+                        { id: 'offenders', label: '요주의 서버 (알람 최다)', state: showAnalysisOffenders, setter: setShowAnalysisOffenders },
+                        { id: 'storage', label: '스토리지 포화 임박 예측', state: showAnalysisStorage, setter: setShowAnalysisStorage },
+                        { id: 'cpu', label: 'CPU 점유율 Top 5', state: showAnalysisCpu, setter: setShowAnalysisCpu },
+                        { id: 'memory', label: '메모리 점유율 Top 5', state: showAnalysisMemory, setter: setShowAnalysisMemory },
+                        { id: 'spikes', label: '사용량 급증 호스트 감지', state: showAnalysisSpikes, setter: setShowAnalysisSpikes },
+                        { id: 'network', label: '네트워크 트래픽 점유율', state: showAnalysisNetwork, setter: setShowAnalysisNetwork },
+                      ].map(item => (
+                        <label key={item.id} className="flex items-center space-x-2.5 cursor-pointer text-gray-600 hover:text-indigo-600 transition-colors">
+                          <input type="checkbox" checked={item.state} onChange={() => item.setter(!item.state)} className="rounded border-gray-300 text-indigo-500 focus:ring-indigo-500 w-4 h-4 cursor-pointer" />
+                          <span className="text-xs font-medium select-none">{item.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  <label className="flex items-center space-x-3 cursor-pointer hover:bg-blue-50 p-3 -mx-3 rounded-xl transition-colors border border-transparent hover:border-blue-100">
+                    <input type="checkbox" checked={showSectionHosts} onChange={() => setShowSectionHosts(!showSectionHosts)} className="rounded text-blue-600 focus:ring-blue-500 w-5 h-5 cursor-pointer" />
+                    <span className="text-sm text-gray-800 font-medium select-none">호스트 상태 표출</span>
+                  </label>
+
+                  <label className="flex items-center space-x-3 cursor-pointer hover:bg-blue-50 p-3 -mx-3 rounded-xl transition-colors border border-transparent hover:border-blue-100">
+                    <input type="checkbox" checked={showSectionProblems} onChange={() => setShowSectionProblems(!showSectionProblems)} className="rounded text-blue-600 focus:ring-blue-500 w-5 h-5 cursor-pointer" />
+                    <span className="text-sm text-gray-800 font-medium select-none">최근 문제(알람) 표출</span>
+                  </label>
+
+                  <label className="flex items-center space-x-3 cursor-pointer hover:bg-blue-50 p-3 -mx-3 rounded-xl transition-colors border border-transparent hover:border-blue-100">
+                    <input type="checkbox" checked={showSectionItems} onChange={() => setShowSectionItems(!showSectionItems)} className="rounded text-blue-600 focus:ring-blue-500 w-5 h-5 cursor-pointer" />
+                    <span className="text-sm text-gray-800 font-medium select-none">관제 아이템 및 트렌드 표출</span>
+                  </label>
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-gray-100 flex justify-end">
+                  <button onClick={() => setIsViewSettingsOpen(false)} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-md w-full">
+                    적용
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 메인 화면 영역 */}
+          <div className={`max-w-7xl mx-auto space-y-6 p-6 ${isExporting ? 'hidden' : 'block'}`}>
+            <header className="flex items-center justify-between bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative z-40">
+              <div className="flex items-center space-x-3">
+                {customLogo ? <img src={customLogo} className="h-10 w-auto object-contain bg-white rounded" /> : <div className="p-3 bg-blue-50 rounded-xl"><DatabaseIcon className="w-8 h-8 text-blue-600" /></div>}
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">Zabbix Report Exporter</h1>
+                  <p className="text-sm text-gray-500">원하는 항목만 선택하여 PDF 보고서를 자동 생성하세요.</p>
+                </div>
+              </div>
+              <div className="flex items-start space-x-4">
+                <div>
+                  <button onClick={() => setIsViewSettingsOpen(true)} className="p-3 rounded-xl transition-colors shadow-sm border bg-white border-gray-200 text-gray-500 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200" title="화면 표시 설정 열기">
+                    <Settings className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex space-x-2">
+                    <button onClick={() => exportPDF()} disabled={!scriptsLoaded || currentTotalData.length === 0 || loading} className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white px-5 py-3 rounded-xl transition-colors font-bold shadow-md text-base">
+                      {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                      <span>PDF 자동 생성 및 다운로드</span>
+                    </button>
+                  </div>
+                  <span className="text-[11px] text-gray-400 font-medium">* 자빅스 원본 그래프를 표시하기 위해 브라우저 로그인 세션이 필요할 수 있습니다.</span>
+                </div>
+              </div>
+            </header>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="md:col-span-1 space-y-4">
+                {/* 1. API 설정 패널 */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                  <div className="flex items-center mb-4">
+                    <Settings className="w-5 h-5 text-gray-600 mr-2" />
+                    <h2 className="text-lg font-semibold text-gray-800 mr-2">API 설정</h2>
+                    <button onClick={() => setIsTokenHelpOpen(true)} className="text-gray-400 hover:text-blue-600 bg-gray-100 hover:bg-blue-50 rounded-full p-1 transition-colors" title="Zabbix API 토큰 발급 안내 보기">
+                      <HelpCircle className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Zabbix API URL</label><input type="text" value={url} onChange={(e) => setUrl(e.target.value)} className="w-full text-sm rounded-lg p-2 border focus:ring-blue-500 outline-none" /></div>
+                    <div><label className="block text-sm font-medium text-gray-700 mb-1">API Token</label><input type="password" value={token} onChange={(e) => setToken(e.target.value)} className="w-full text-sm rounded-lg p-2 border focus:ring-blue-500 outline-none" /></div>
+
+                    {/* ★ 기간 설정 UI 디자인 개편 (날짜, 시간 각각 분리 입력) */}
+                    <div className="pt-3 border-t border-gray-100">
+                      <label className="flex items-center text-sm font-medium text-gray-700 mb-3"><CalendarIcon className="w-4 h-4 mr-1 text-gray-500" />기간 설정</label>
+                      <div className="flex flex-col gap-4">
+
+                        {/* 시작 일시 */}
+                        <div className="flex flex-col gap-1.5">
+                          <div className="text-xs font-bold text-gray-500 pl-1 flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-blue-400 mr-1.5"></span>시작일시</div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="date"
+                              value={startDate.split('T')[0]}
+                              onChange={(e) => setStartDate(`${e.target.value}T${startDate.split('T')[1] || '00:00'}`)}
+                              onFocus={(e) => { try { e.target.showPicker(); } catch (e) { } }}
+                              onClick={(e) => { try { e.target.showPicker(); } catch (e) { } }}
+                              className="w-full text-sm p-2 outline-none bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 transition-shadow cursor-pointer"
+                            />
+                            <input
+                              type="time"
+                              value={startDate.split('T')[1] || '00:00'}
+                              onChange={(e) => setStartDate(`${startDate.split('T')[0] || getLocalTodayString()}T${e.target.value}`)}
+                              onFocus={(e) => { try { e.target.showPicker(); } catch (e) { } }}
+                              onClick={(e) => { try { e.target.showPicker(); } catch (e) { } }}
+                              className="w-full text-sm p-2 outline-none bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 transition-shadow cursor-pointer"
+                            />
+                          </div>
+                        </div>
+
+                        {/* 종료 일시 */}
+                        <div className="flex flex-col gap-1.5">
+                          <div className="text-xs font-bold text-gray-500 pl-1 flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-red-400 mr-1.5"></span>종료일시</div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="date"
+                              value={endDate.split('T')[0]}
+                              onChange={(e) => setEndDate(`${e.target.value}T${endDate.split('T')[1] || '23:59'}`)}
+                              onFocus={(e) => { try { e.target.showPicker(); } catch (e) { } }}
+                              onClick={(e) => { try { e.target.showPicker(); } catch (e) { } }}
+                              className="w-full text-sm p-2 outline-none bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 transition-shadow cursor-pointer"
+                            />
+                            <input
+                              type="time"
+                              value={endDate.split('T')[1] || '23:59'}
+                              onChange={(e) => setEndDate(`${endDate.split('T')[0] || getLocalTodayString()}T${e.target.value}`)}
+                              onFocus={(e) => { try { e.target.showPicker(); } catch (e) { } }}
+                              onClick={(e) => { try { e.target.showPicker(); } catch (e) { } }}
+                              className="w-full text-sm p-2 outline-none bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 transition-shadow cursor-pointer"
+                            />
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+
+                    <div className="pt-2 flex flex-col gap-2 border-t border-gray-100 mt-2">
+                      <button onClick={fetchAllDashboard} className="w-full flex justify-center items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg text-sm shadow-md font-bold mt-2"><LayoutDashboard className="w-4 h-4" /><span>전체 대시보드 갱신</span></button>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button onClick={fetchHosts} className="flex justify-center items-center bg-gray-800 hover:bg-gray-900 text-white px-2 py-2.5 rounded-lg text-xs transition" title="호스트"><Server className="w-4 h-4" /></button>
+                        <button onClick={fetchProblems} className="flex justify-center items-center bg-gray-800 hover:bg-gray-900 text-white px-2 py-2.5 rounded-lg text-xs transition" title="문제"><AlertCircle className="w-4 h-4" /></button>
+                        <button onClick={fetchItems} className="flex justify-center items-center bg-gray-800 hover:bg-gray-900 text-white px-2 py-2.5 rounded-lg text-xs transition" title="아이템"><Activity className="w-4 h-4" /></button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. 고급 설정 및 프로필 패널 */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                  <div className="flex items-center mb-4">
+                    <FileText className="w-5 h-5 text-gray-600 mr-2" />
+                    <h2 className="text-lg font-semibold text-gray-800">보고서 고급 설정</h2>
+                  </div>
+
+                  <div className="space-y-4">
+                    {/* 프로필 내보내기/불러오기 */}
+                    <div className="flex gap-2">
+                      <button onClick={handleExportProfile} className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 px-3 py-2 rounded-lg text-xs font-bold transition flex justify-center items-center">
+                        <Download className="w-3.5 h-3.5 mr-1" /> 백업 (Export)
+                      </button>
+                      <button onClick={() => fileInputRef.current.click()} className="flex-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3 py-2 rounded-lg text-xs font-bold transition flex justify-center items-center">
+                        <Upload className="w-3.5 h-3.5 mr-1" /> 복구 (Import)
+                      </button>
+                      <input type="file" accept=".json" className="hidden-input" ref={fileInputRef} onChange={handleImportProfile} />
+                    </div>
+
+                    {/* 커스텀 로고 적용 */}
+                    <div className="pt-2 border-t border-gray-100">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">커스텀 로고 삽입</label>
+                      <div className="flex gap-2 items-center">
+                        <button onClick={() => logoInputRef.current.click()} className="flex-1 bg-gray-50 hover:bg-gray-100 border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-xs font-bold transition flex justify-center items-center">
+                          <ImageIcon className="w-3.5 h-3.5 mr-1" /> 로고 이미지 선택
+                        </button>
+                        {draftCustomLogo && <button onClick={() => setDraftCustomLogo('')} className="bg-red-50 text-red-600 border border-red-200 px-3 py-2 rounded-lg text-xs font-bold hover:bg-red-100">삭제</button>}
+                        <input type="file" accept="image/*" className="hidden-input" ref={logoInputRef} onChange={handleLogoUpload} />
+                      </div>
+                    </div>
+
+                    {/* 워터마크 입력 */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">배경 워터마크</label>
+                      <input type="text" value={draftWatermarkText} onChange={(e) => setDraftWatermarkText(e.target.value)} placeholder="예: CONFIDENTIAL" className="w-full text-sm rounded-lg p-2 border focus:ring-blue-500 outline-none" />
+                    </div>
+
+                    {/* 그래프 크기 설정 */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">그래프 표출 크기</label>
+                      <select value={draftGraphSize} onChange={(e) => setDraftGraphSize(e.target.value)} className="w-full text-sm border border-gray-300 rounded-lg p-2 focus:ring-blue-500 outline-none bg-white">
+                        <option value="small">작게 (1페이지 8개)</option>
+                        <option value="medium">보통 (1페이지 6개)</option>
+                        <option value="large">크게 (1페이지 3개)</option>
+                      </select>
+                    </div>
+
+                    <div className="pt-4 border-t border-gray-100 mt-2">
+                      <button onClick={handleSaveAdvancedSettings} className="w-full flex justify-center items-center space-x-2 bg-gray-800 hover:bg-gray-900 text-white px-4 py-3 rounded-lg text-sm shadow-md font-bold transition">
+                        <Settings className="w-4 h-4" /><span>설정 저장 및 적용</span>
+                      </button>
+                    </div>
+
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100">
+                  <div className="flex items-start space-x-2">
+                    <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-blue-800 space-y-2">
+                      <p className="font-semibold">테스트 가상 데이터 로드</p>
+                      <button onClick={() => loadMockData('dashboard')} className="w-full text-xs bg-white text-blue-700 border border-blue-200 py-2 rounded shadow-sm hover:bg-blue-100 font-bold mb-1">가상 대시보드 전체 로드</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="md:col-span-3">
+                <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 min-h-[600px] transition-all duration-300">
+                  <div className="border-b-2 border-gray-800 pb-4 mb-6">
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <h2 className="text-2xl font-bold text-gray-900 mb-2">데이터 미리보기 (Web View)</h2>
+                        <p className="text-gray-500 text-sm">선택한 항목들이 자동 분할되어 A4 크기의 고품질 PDF로 변환됩니다.</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-gray-800">추출 대상 / 총 데이터</p>
+                        <div className="flex items-center justify-end space-x-3 mt-1">
+                          {currentTotalData.length > 0 && (
+                            <label className="flex items-center space-x-1.5 cursor-pointer text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded transition">
+                              <input type="checkbox" checked={currentTotalData.every(item => selectedIds.includes(getItemId(item)))} onChange={toggleAllGlobal} className="w-4 h-4 rounded text-blue-600 cursor-pointer" />
+                              <span>전체 선택</span>
+                            </label>
+                          )}
+                          <p className="text-2xl font-bold text-blue-600">{selectedIds.length === 0 ? currentTotalData.length : selectedIds.length} <span className="text-lg text-gray-400 font-normal">/ {currentTotalData.length} 건</span></p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {currentTotalData.length > 0 ? (
+                    <>
+                      {showSectionAnalysis && renderAnalysisSection()}
+                      {showSectionHosts && renderHostsWeb()}
+                      {showSectionProblems && renderProblemsWeb()}
+                      {showSectionItems && renderItemsWeb()}
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                      <LayoutDashboard className="w-12 h-12 mb-3 text-gray-300" />
+                      <p>{(hostsData.length || problemsData.length || itemsData.length) ? '활성화된 항목이 없습니다. 상단 화면 표시 설정을 확인해주세요.' : '조회된 데이터가 없습니다.'}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- React 렌더링 실행 ---
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+
+</html>
