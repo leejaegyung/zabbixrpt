@@ -30,7 +30,7 @@ const confirm = () => {
       <div class="px-6 py-4 bg-canvas border-t border-hairline flex justify-end gap-2">
         <button v-if="ui.modalConfig.type === 'confirm'" @click="ui.closeModal()" class="btn-outline px-5 py-2.5">취소</button>
         <button @click="confirm" class="px-5 py-2.5 rounded-none text-[13px] font-bold uppercase tracking-cta text-ink transition-colors"
-          :class="ui.modalConfig.type === 'confirm' ? 'bg-rosso hover:bg-rosso-active' : 'bg-ink !text-canvas hover:bg-white/90'">확인</button>
+          :class="ui.modalConfig.type === 'confirm' ? 'bg-rosso hover:bg-rosso-active' : 'bg-ink !text-canvas hover:bg-ink/90'">확인</button>
       </div>
     </div>
   </div>

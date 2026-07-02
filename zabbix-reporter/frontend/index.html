@@ -5,9 +5,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Zabbix PDF Exporter</title>
+  <!-- 페인트 전에 저장된 테마를 적용해 잘못된 색 깜빡임(FOUC) 방지 -->
+  <script>
+    try {
+      if (localStorage.getItem('zabbixTheme') === 'light') {
+        document.documentElement.classList.add('theme-light')
+      }
+    } catch (e) {}
+  </script>
 </head>
 
-<body class="bg-gray-50">
+<body>
   <div id="app"></div>
   <script type="module" src="/src/main.js"></script>
 </body>

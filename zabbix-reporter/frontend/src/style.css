@@ -2,11 +2,44 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── 테마 팔레트 (RGB 트리플, tailwind rgb(var(--…)) 토큰이 참조) ──
+   기본(:root)은 다크 모드. html.theme-light 클래스가 붙으면 화이트 모드로 스왑. */
+:root {
+  --c-canvas: 24 24 24; /* #181818 near-black page floor */
+  --c-elevated: 34 34 34; /* #222222 cards/panels */
+  --c-elevated-2: 48 48 48; /* #303030 raised cells, inputs */
+  --c-ink: 255 255 255; /* #ffffff */
+  --c-body: 150 150 150; /* #969696 */
+  --c-muted: 102 102 102; /* #666666 */
+  --c-muted-soft: 143 143 143; /* #8f8f8f */
+  --c-hairline: 48 48 48; /* #303030 */
+  --c-hairline-strong: 61 61 61; /* #3d3d3d */
+  --c-scrollbar-track: #181818;
+  --c-scrollbar-thumb: #3d3d3d;
+  --c-scrollbar-thumb-hover: #4a4a4a;
+  color-scheme: dark;
+}
+
+html.theme-light {
+  --c-canvas: 244 244 242; /* #f4f4f2 warm off-white floor */
+  --c-elevated: 255 255 255; /* #ffffff cards/panels */
+  --c-elevated-2: 236 236 234; /* #ececea raised cells, inputs */
+  --c-ink: 26 26 26; /* #1a1a1a near-black text/marks */
+  --c-body: 74 74 74; /* #4a4a4a */
+  --c-muted: 154 154 154; /* #9a9a9a */
+  --c-muted-soft: 107 107 107; /* #6b6b6b */
+  --c-hairline: 224 224 221; /* #e0e0dd */
+  --c-hairline-strong: 200 200 196; /* #c8c8c4 */
+  --c-scrollbar-track: #ececea;
+  --c-scrollbar-thumb: #c8c8c4;
+  --c-scrollbar-thumb-hover: #b0b0ac;
+  color-scheme: light;
+}
+
 @layer base {
   html, body {
     @apply bg-canvas text-body font-sans antialiased;
-    /* 네이티브 컨트롤(날짜 달력·시간·select 드롭다운·스크롤바)을 다크로 렌더 */
-    color-scheme: dark;
+    /* 네이티브 컨트롤(날짜 달력·시간·select 드롭다운·스크롤바)은 color-scheme 로 렌더 */
   }
   /* 다크 캔버스용 폼 컨트롤 */
   select option {
@@ -39,13 +72,36 @@
   /* 아웃라인 CTA — 1px ink 보더 */
   .btn-outline {
     @apply inline-flex items-center justify-center gap-2 bg-transparent text-ink text-[13px] font-bold uppercase tracking-cta
-           px-6 py-3 rounded-none border border-hairline-strong transition-colors hover:border-ink hover:bg-white/5;
+           px-6 py-3 rounded-none border border-hairline-strong transition-colors hover:border-ink hover:bg-ink/5;
   }
 
   /* 고스트(아이콘) 버튼 */
   .btn-ghost {
     @apply inline-flex items-center justify-center bg-elevated-2 text-body rounded-none border border-hairline
            transition-colors hover:text-ink hover:border-hairline-strong;
+  }
+
+  /* 세그먼트형 아이콘 버튼 — 채움 없이 헤어라인 컨테이너 안에서 hover 시 은은한 채움 */
+  .icon-seg {
+    @apply inline-flex items-center justify-center w-11 h-11 text-muted-soft rounded-none
+           transition-colors hover:text-ink hover:bg-elevated-2;
+  }
+
+  /* PDF 1차 CTA — 계기판형 세그먼트(리딩 아이콘 셀 + 라벨). 샤프, 그림자 없음. */
+  .cta-pdf {
+    @apply inline-flex items-stretch rounded-none overflow-hidden bg-rosso text-white
+           transition-colors hover:bg-rosso-active
+           disabled:bg-elevated-2 disabled:text-muted disabled:cursor-not-allowed;
+  }
+  /* 리딩 아이콘 셀 — 살짝 어두운 계기 셀 + 세로 헤어라인, hover 시 강조 */
+  .cta-pdf-icon {
+    @apply flex items-center justify-center self-stretch px-[18px] bg-black/10 border-r border-white/20
+           transition-colors group-hover:bg-black/20
+           group-disabled:bg-transparent group-disabled:border-hairline;
+  }
+  /* 라벨 셀 — 대문자 트래킹 */
+  .cta-pdf-label {
+    @apply flex items-center justify-center px-6 py-3.5 text-[13px] font-bold uppercase tracking-cta;
   }
 
   /* 다크 elevated 카드 — 샤프, 헤어라인 보더, 그림자 없음 */
@@ -81,20 +137,20 @@
   display: none;
 }
 
-/* 다크 스크롤바 */
+/* 테마 스크롤바 (변수로 다크/화이트 스왑) */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #181818;
+  background: var(--c-scrollbar-track);
 }
 ::-webkit-scrollbar-thumb {
-  background: #3d3d3d;
+  background: var(--c-scrollbar-thumb);
   border-radius: 0;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #4a4a4a;
+  background: var(--c-scrollbar-thumb-hover);
 }
 
 /* 날짜/시간 인풋 — color-scheme:dark 가 아이콘을 밝게 렌더하므로 invert 불필요 */

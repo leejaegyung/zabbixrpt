@@ -4,6 +4,7 @@ import { useDataStore } from './stores/data.js'
 import { useViewSettingsStore } from './stores/viewSettings.js'
 import { useAdvancedStore } from './stores/advanced.js'
 import { useUiStore } from './stores/ui.js'
+import { useThemeStore } from './stores/theme.js'
 import { getItemId } from './composables/useFormat.js'
 import { usePdfExport } from './composables/usePdfExport.js'
 
@@ -23,6 +24,8 @@ const data = useDataStore()
 const view = useViewSettingsStore()
 const adv = useAdvancedStore()
 const ui = useUiStore()
+const theme = useThemeStore()
+theme.init()
 const { exportPdf } = usePdfExport()
 
 const total = computed(() => data.currentTotalData)
@@ -56,24 +59,47 @@ const hasAnyData = computed(() => data.hostsData.length || data.problemsData.len
             <div class="flex items-center gap-4">
               <div class="flex items-center justify-center w-12 h-12 bg-rosso shrink-0 overflow-hidden">
                 <img v-if="adv.customLogo" :src="adv.customLogo" class="w-full h-full object-contain" />
-                <Icon v-else name="Database" class="w-7 h-7 text-ink" />
+                <Icon v-else name="Database" class="w-7 h-7 text-white" />
               </div>
               <div>
                 <p class="eyebrow mb-1.5">Infrastructure Telemetry</p>
                 <h1 class="display-title text-3xl sm:text-4xl">Zabbix Report Exporter</h1>
               </div>
             </div>
-            <div class="flex items-stretch gap-3 w-full lg:w-auto">
-              <button @click="ui.isSettingsOpen = true" title="설정" class="btn-ghost shrink-0 w-12">
-                <Icon name="Settings" class="w-5 h-5" />
-              </button>
-              <div class="flex flex-col items-stretch lg:items-end gap-2 flex-1 lg:flex-none">
-                <button @click="exportPdf" :disabled="total.length === 0 || data.loading" class="btn-rosso w-full lg:w-auto">
-                  <Icon :name="data.loading ? 'Loader2' : 'Download'" class="w-4 h-4" />
-                  <span>PDF 보고서 생성</span>
+            <!-- 1차 CTA + 유틸리티 아이콘 + 보조 안내 -->
+            <div class="flex flex-col items-stretch lg:items-end gap-2 w-full lg:w-auto">
+              <div class="flex items-center gap-4 sm:gap-5 w-full lg:w-auto">
+                <!-- 1차 CTA -->
+                <button @click="exportPdf" :disabled="total.length === 0 || data.loading" class="group cta-pdf flex-1 lg:flex-none">
+                  <span class="cta-pdf-icon">
+                    <Icon :name="data.loading ? 'Loader2' : 'Download'" class="w-4 h-4 transition-transform group-hover:translate-y-0.5" />
+                  </span>
+                  <span class="cta-pdf-label">PDF 보고서 생성</span>
                 </button>
-                <span class="text-[11px] text-muted text-center lg:text-right lg:max-w-[260px] leading-snug">* 자빅스 원본 그래프 표시를 위해 브라우저 로그인 세션이 필요할 수 있습니다.</span>
+
+                <!-- 세로 구분선 (1차 액션 ↔ 유틸리티) -->
+                <div class="w-px h-9 bg-hairline shrink-0"></div>
+
+                <!-- 유틸리티 아이콘 세그먼트 (샤프, 공유 헤어라인 · 채움 없음) -->
+                <div class="flex items-center border border-hairline divide-x divide-hairline shrink-0">
+                  <button
+                    @click="theme.toggle()"
+                    :title="theme.isLight ? '다크 모드로 전환' : '화이트 모드로 전환'"
+                    :aria-label="theme.isLight ? '다크 모드로 전환' : '화이트 모드로 전환'"
+                    class="icon-seg"
+                  >
+                    <Icon :name="theme.isLight ? 'Moon' : 'Sun'" class="w-[18px] h-[18px]" />
+                  </button>
+                  <button @click="ui.isSettingsOpen = true" title="설정" aria-label="설정" class="icon-seg">
+                    <Icon name="Settings" class="w-[18px] h-[18px]" />
+                  </button>
+                </div>
               </div>
+
+              <span class="flex items-center gap-1.5 justify-center lg:justify-end text-[11px] text-muted lg:max-w-[280px] leading-snug">
+                <Icon name="Info" class="w-3 h-3 shrink-0 text-muted-soft" />
+                <span>자빅스 원본 그래프 표시를 위해 브라우저 로그인 세션이 필요할 수 있습니다.</span>
+              </span>
             </div>
           </div>
         </header>

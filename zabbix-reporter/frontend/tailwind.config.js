@@ -4,16 +4,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Ferrari-inspired telemetry palette
-        canvas: '#181818', // near-black page floor (slightly warm, never pure black)
-        elevated: '#222222', // cards/panels on canvas
-        'elevated-2': '#303030', // raised cells, inputs
-        ink: '#ffffff',
-        body: '#969696',
-        muted: '#666666',
-        'muted-soft': '#8f8f8f',
-        hairline: '#303030',
-        'hairline-strong': '#3d3d3d',
+        // Ferrari-inspired telemetry palette.
+        // Theme-varying tokens resolve to CSS variables (RGB triplets) so a
+        // single class on <html> swaps the whole palette (dark ⇄ light) while
+        // Tailwind alpha modifiers (e.g. bg-canvas/95) keep working.
+        canvas: 'rgb(var(--c-canvas) / <alpha-value>)', // page floor
+        elevated: 'rgb(var(--c-elevated) / <alpha-value>)', // cards/panels
+        'elevated-2': 'rgb(var(--c-elevated-2) / <alpha-value>)', // raised cells, inputs
+        ink: 'rgb(var(--c-ink) / <alpha-value>)',
+        body: 'rgb(var(--c-body) / <alpha-value>)',
+        muted: 'rgb(var(--c-muted) / <alpha-value>)',
+        'muted-soft': 'rgb(var(--c-muted-soft) / <alpha-value>)',
+        hairline: 'rgb(var(--c-hairline) / <alpha-value>)',
+        'hairline-strong': 'rgb(var(--c-hairline-strong) / <alpha-value>)',
         rosso: {
           DEFAULT: '#da291c', // Rosso Corsa — the single brand voltage
           active: '#b01e0a',
