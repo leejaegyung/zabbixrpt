@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useDataStore } from '../../stores/data.js'
 import { useViewSettingsStore } from '../../stores/viewSettings.js'
 import { computeAnalysis } from '../../composables/useAnalysis.js'
@@ -24,6 +24,12 @@ const a = computed(() =>
 )
 const netValue = (item) => formatItemValue({ ...item, lastvalue: item.avgValue })
 
+// 선택된 항목이 없으면 분석 결과가 비어(오해 소지) → 웹 화면에서 자동으로 접고, 다시 선택되면 펼침.
+const hasSelection = computed(() => data.selectedIds.length > 0)
+if (!props.pdf) {
+  watch(hasSelection, (has) => { view.collapsed.analysis = !has })
+}
+
 // 테마 토큰: PDF(흰 종이)는 라이트, 웹은 다크. 동일 마크업으로 양쪽 지원.
 const c = computed(() =>
   props.pdf
@@ -39,7 +45,8 @@ const c = computed(() =>
         <Icon name="ChevronDown" class="w-5 h-5 mr-2 text-muted transition-transform group-hover:text-ink" :class="{ '-rotate-90': view.collapsed.analysis }" />
         <Icon name="Sparkles" class="w-4 h-4 mr-2.5 text-rosso" />
         <span class="text-[13px] font-semibold text-ink uppercase tracking-nav">Smart Analysis</span>
-        <span class="text-[11px] ml-3 text-muted uppercase tracking-cta">7 Signals</span>
+        <span v-if="hasSelection" class="text-[11px] ml-3 text-muted uppercase tracking-cta">7 Signals</span>
+        <span v-else class="text-[11px] ml-3 text-muted uppercase tracking-cta">선택 없음</span>
       </button>
       <label class="flex items-center gap-2 cursor-pointer text-[11px] uppercase tracking-cta font-semibold text-body hover:text-ink transition">
         <input type="checkbox" v-model="view.includeAnalysisInPdf" class="w-4 h-4 rounded-none bg-elevated-2 border-hairline-strong text-rosso focus:ring-rosso cursor-pointer" />
