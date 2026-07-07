@@ -120,6 +120,10 @@ const hasAnyData = computed(() => data.hostsData.length || data.problemsData.len
                     <div>
                       <p class="eyebrow mb-2">Data Preview</p>
                       <h2 class="display-title text-2xl">미리보기 / 추출 대상 선택</h2>
+                      <p v-if="total.length > 0" class="text-[12px] text-muted mt-2 flex items-center gap-1.5">
+                        <Icon name="Info" class="w-3.5 h-3.5 shrink-0 text-muted-soft" />
+                        <span>분석·미리보기와 PDF에는 <strong class="text-body font-semibold">선택한 항목만</strong> 반영됩니다. (선택 해제 시 제외)</span>
+                      </p>
                     </div>
                     <div class="flex items-end gap-5 shrink-0">
                       <label v-if="total.length > 0" class="flex items-center gap-2 cursor-pointer text-[11px] uppercase tracking-cta font-semibold text-body hover:text-ink transition">
