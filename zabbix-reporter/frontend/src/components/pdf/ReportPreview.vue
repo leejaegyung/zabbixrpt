@@ -144,10 +144,10 @@ const coverStats = computed(() => {
             <td class="py-3 px-4 text-sm text-gray-500">{{ item.host }}</td>
             <td class="py-3 px-4 text-sm text-gray-600">{{ displayIp(item) }}</td>
             <td class="py-3 px-4 text-sm text-center">
-              <span v-if="getHostStatusInfo(item) === 'DISABLED'" class="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-500 border border-gray-200">비활성</span>
-              <span v-else-if="getHostStatusInfo(item) === 'NORMAL'" class="px-3 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-200">ZBX 정상</span>
-              <span v-else-if="getHostStatusInfo(item) === 'ERROR'" class="px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200">ZBX 오류</span>
-              <span v-else class="px-3 py-1 rounded-full text-xs font-bold bg-gray-50 text-gray-600 border border-gray-200">상태 대기</span>
+              <span v-if="getHostStatusInfo(item) === 'DISABLED'" class="inline-flex items-center leading-none px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-500 border border-gray-200">비활성</span>
+              <span v-else-if="getHostStatusInfo(item) === 'NORMAL'" class="inline-flex items-center leading-none px-3 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-200">ZBX 정상</span>
+              <span v-else-if="getHostStatusInfo(item) === 'ERROR'" class="inline-flex items-center leading-none px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200">ZBX 오류</span>
+              <span v-else class="inline-flex items-center leading-none px-3 py-1 rounded-full text-xs font-bold bg-gray-50 text-gray-600 border border-gray-200">상태 대기</span>
             </td>
           </tr>
         </tbody>
@@ -171,7 +171,7 @@ const coverStats = computed(() => {
           <tr v-for="item in page" :key="getItemId(item)">
             <td class="py-3 px-4 text-sm text-gray-600">{{ fmtDateTime(item.clock) }}</td>
             <td class="py-3 px-4 text-sm text-gray-700 font-medium">{{ item.hosts?.[0]?.name || 'N/A' }}</td>
-            <td class="py-3 px-4 text-sm"><span class="px-2.5 py-1 rounded-md text-xs font-bold" :class="getSeverityColor(item.severity)">{{ getSeverityText(item.severity) }}</span></td>
+            <td class="py-3 px-4 text-sm"><span class="inline-flex items-center leading-none px-2.5 py-1 rounded-md text-xs font-bold" :class="getSeverityColor(item.severity)">{{ getSeverityText(item.severity) }}</span></td>
             <td class="py-3 px-4 text-sm font-medium text-gray-800">{{ item.name }}</td>
           </tr>
         </tbody>

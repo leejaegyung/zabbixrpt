@@ -37,8 +37,12 @@ export function usePdfExport() {
       ui.isExporting = true
       window.scrollTo(0, 0)
 
-      // 오프스크린 ReportPreview 렌더 + 그래프 이미지 로드 대기
+      // 오프스크린 ReportPreview 렌더 + 폰트/그래프 이미지 로드 대기
       await nextTick()
+      // 웹폰트(Inter)가 로드되기 전에 캡처하면 대체 폰트로 그려져 아이콘·글자 정렬이 어긋남
+      if (document.fonts?.ready) {
+        try { await document.fonts.ready } catch { /* 폰트 API 미지원 무시 */ }
+      }
       await new Promise((resolve) => setTimeout(resolve, 1500))
 
       const pages = document.querySelectorAll('.pdf-page')
@@ -53,7 +57,7 @@ export function usePdfExport() {
       let firstPage = true
       for (let i = 0; i < pages.length; i++) {
         const canvas = await html2canvas(pages[i], {
-          scale: 1.5,
+          scale: 2, // 텍스트·아이콘 선명도 향상
           useCORS: true,
           logging: false,
           backgroundColor: '#ffffff',
