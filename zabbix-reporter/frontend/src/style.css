@@ -132,6 +132,12 @@ html.theme-light {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* html2canvas는 글자를 line-box 위쪽에 그려서, 줄높이가 빠듯한 truncate(overflow:hidden)
+   요소는 글자 위/아래가 세로로 잘린다. 줄높이를 넉넉히 줘 잘림 방지. */
+.pdf-page .truncate {
+  line-height: 1.7;
+}
+
 /* 숨김 처리되는 네이티브 파일 입력 */
 .hidden-input {
   display: none;
