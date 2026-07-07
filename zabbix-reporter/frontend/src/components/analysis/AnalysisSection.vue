@@ -85,9 +85,9 @@ const c = computed(() =>
           <div v-for="(item, idx) in a.storageForecast" :key="idx" class="p-2.5" :class="c.cell">
             <div class="flex justify-between items-center mb-1.5 gap-2">
               <span class="text-xs font-semibold truncate" :class="c.strong" :title="item.hosts?.[0]?.name">{{ item.hosts?.[0]?.name }}</span>
-              <span v-if="item.prediction.status === 'critical'" class="inline-flex items-center justify-center h-5 leading-none text-[10px] px-2 font-bold uppercase tracking-cta bg-rosso text-ink shrink-0">Critical</span>
-              <span v-else-if="item.prediction.status === 'warning'" class="inline-flex items-center justify-center h-5 leading-none text-[10px] px-2 font-bold uppercase tracking-cta shrink-0" :class="pdf ? 'bg-orange-100 text-orange-700' : 'text-sig-warning border border-sig-warning/40'">D-{{ item.prediction.daysLeft }}</span>
-              <span v-else class="inline-flex items-center justify-center h-5 leading-none text-[10px] px-2 font-bold uppercase tracking-cta shrink-0" :class="pdf ? 'bg-green-50 text-green-700' : 'text-sig-success border border-sig-success/40'">Stable</span>
+              <span v-if="item.prediction.status === 'critical'" class="report-badge inline-flex items-center justify-center h-[22px] leading-none text-[10px] px-2 font-bold uppercase tracking-cta bg-rosso text-ink shrink-0">Critical</span>
+              <span v-else-if="item.prediction.status === 'warning'" class="report-badge inline-flex items-center justify-center h-[22px] leading-none text-[10px] px-2 font-bold uppercase tracking-cta shrink-0" :class="pdf ? 'bg-orange-100 text-orange-700' : 'text-sig-warning border border-sig-warning/40'">D-{{ item.prediction.daysLeft }}</span>
+              <span v-else class="report-badge inline-flex items-center justify-center h-[22px] leading-none text-[10px] px-2 font-bold uppercase tracking-cta shrink-0" :class="pdf ? 'bg-green-50 text-green-700' : 'text-sig-success border border-sig-success/40'">Stable</span>
             </div>
             <div class="flex justify-between items-end gap-2">
               <span class="text-[10px] truncate flex-1" :class="c.sub" :title="item.name">{{ item.name }}</span>

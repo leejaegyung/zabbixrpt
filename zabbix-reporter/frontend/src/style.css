@@ -138,6 +138,13 @@ html.theme-light {
   line-height: 1.7;
 }
 
+/* 배지(pill): 웹에선 items-center로 정상 중앙정렬. 그러나 html2canvas는 텍스트를
+   아래로 그려 중앙이 어긋나므로, PDF 캡처 대상(.pdf-page)에서만 flex-start로 뒤집으면
+   고정 높이(글꼴 2배)와 맞물려 실제로는 정확히 중앙에 온다. */
+.pdf-page .report-badge {
+  align-items: flex-start;
+}
+
 /* 숨김 처리되는 네이티브 파일 입력 */
 .hidden-input {
   display: none;
