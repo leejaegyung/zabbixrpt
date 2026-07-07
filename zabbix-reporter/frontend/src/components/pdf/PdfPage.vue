@@ -6,20 +6,22 @@ import Icon from '../common/Icon.vue'
 defineProps({
   title: { type: String, default: '' }, // 섹션 제목 (해당 섹션 첫 페이지에만)
   showHeader: { type: Boolean, default: false },
+  cover: { type: Boolean, default: false }, // 표지: 섹션 헤더 없이 내용 세로 중앙 정렬
 })
 const adv = useAdvancedStore()
 </script>
 
 <template>
-  <div class="pdf-page bg-gray-50 w-[1000px] h-[1414px] p-12 relative flex flex-col justify-start overflow-hidden">
+  <div class="pdf-page bg-gray-50 w-[1000px] h-[1414px] p-12 relative flex flex-col overflow-hidden"
+    :class="cover ? 'justify-center' : 'justify-start'">
     <!-- 워터마크 -->
     <div v-if="adv.watermarkText" class="absolute top-1/2 left-1/2 pointer-events-none z-0 opacity-10"
       style="transform: translate(-50%, -50%) rotate(-45deg)">
       <span class="text-[9rem] font-black text-gray-500 whitespace-nowrap">{{ adv.watermarkText }}</span>
     </div>
 
-    <!-- 섹션 헤더 -->
-    <div v-if="showHeader" class="flex justify-between items-center border-b-2 border-gray-800 pb-4 mb-8 relative z-10">
+    <!-- 섹션 헤더 (표지에는 표시하지 않음) -->
+    <div v-if="showHeader && !cover" class="flex justify-between items-center border-b-2 border-gray-800 pb-4 mb-8 relative z-10">
       <h3 class="text-3xl font-bold text-gray-900 flex items-center">
         <slot name="icon" /> {{ title }}
       </h3>
@@ -29,7 +31,7 @@ const adv = useAdvancedStore()
       </div>
     </div>
 
-    <div class="relative z-10 flex-grow flex flex-col">
+    <div class="relative z-10 flex flex-col" :class="cover ? 'justify-center' : 'flex-grow'">
       <slot />
     </div>
   </div>

@@ -99,6 +99,14 @@ const cb = 'w-4 h-4 rounded-none bg-elevated-2 border-hairline-strong text-rosso
             <p class="eyebrow mb-4">Report</p>
             <div class="space-y-5">
               <div>
+                <label class="eyebrow block mb-2">보고서 제목 (표지)</label>
+                <input type="text" v-model="adv.draftReportTitle" placeholder="예: Zabbix 인프라 점검 리포트" class="field" />
+              </div>
+              <div>
+                <label class="eyebrow block mb-2">회사명 (표지)</label>
+                <input type="text" v-model="adv.draftCompanyName" placeholder="예: OO 주식회사" class="field" />
+              </div>
+              <div>
                 <label class="eyebrow block mb-2">Custom Logo</label>
                 <div class="flex gap-2 items-center">
                   <button @click="logoInputRef.click()" class="btn-ghost flex-1 py-2.5 text-[12px] gap-1.5 font-semibold">

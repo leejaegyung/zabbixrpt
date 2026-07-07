@@ -7,10 +7,14 @@ export const useAdvancedStore = defineStore('advanced', {
     customLogo: localStorage.getItem('zabbixCustomLogo') || '',
     watermarkText: localStorage.getItem('zabbixWatermark') || '',
     graphSize: localStorage.getItem('zabbixGraphSize') || 'medium',
+    reportTitle: localStorage.getItem('zabbixReportTitle') || '',
+    companyName: localStorage.getItem('zabbixCompanyName') || '',
 
     draftCustomLogo: localStorage.getItem('zabbixCustomLogo') || '',
     draftWatermarkText: localStorage.getItem('zabbixWatermark') || '',
     draftGraphSize: localStorage.getItem('zabbixGraphSize') || 'medium',
+    draftReportTitle: localStorage.getItem('zabbixReportTitle') || '',
+    draftCompanyName: localStorage.getItem('zabbixCompanyName') || '',
   }),
   getters: {
     // 그래프 크기별 그리드 페이지당 개수
@@ -21,12 +25,16 @@ export const useAdvancedStore = defineStore('advanced', {
       this.customLogo = this.draftCustomLogo
       this.watermarkText = this.draftWatermarkText
       this.graphSize = this.draftGraphSize
+      this.reportTitle = this.draftReportTitle
+      this.companyName = this.draftCompanyName
       localStorage.setItem('zabbixCustomLogo', this.customLogo)
       localStorage.setItem('zabbixWatermark', this.watermarkText)
       localStorage.setItem('zabbixGraphSize', this.graphSize)
+      localStorage.setItem('zabbixReportTitle', this.reportTitle)
+      localStorage.setItem('zabbixCompanyName', this.companyName)
     },
     // 프로필 불러오기 등 외부에서 직접 반영할 때
-    apply({ customLogo, watermarkText, graphSize }) {
+    apply({ customLogo, watermarkText, graphSize, reportTitle, companyName }) {
       if (customLogo !== undefined) {
         this.customLogo = customLogo
         this.draftCustomLogo = customLogo
@@ -39,9 +47,19 @@ export const useAdvancedStore = defineStore('advanced', {
         this.graphSize = graphSize
         this.draftGraphSize = graphSize
       }
+      if (reportTitle !== undefined) {
+        this.reportTitle = reportTitle
+        this.draftReportTitle = reportTitle
+      }
+      if (companyName !== undefined) {
+        this.companyName = companyName
+        this.draftCompanyName = companyName
+      }
       localStorage.setItem('zabbixCustomLogo', this.customLogo)
       localStorage.setItem('zabbixWatermark', this.watermarkText)
       localStorage.setItem('zabbixGraphSize', this.graphSize)
+      localStorage.setItem('zabbixReportTitle', this.reportTitle)
+      localStorage.setItem('zabbixCompanyName', this.companyName)
     },
   },
 })

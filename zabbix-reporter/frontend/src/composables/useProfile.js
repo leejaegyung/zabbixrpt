@@ -24,6 +24,8 @@ export function exportProfile() {
     customLogo: adv.customLogo,
     watermarkText: adv.watermarkText,
     graphSize: adv.graphSize,
+    reportTitle: adv.reportTitle,
+    companyName: adv.companyName,
   }
   VIEW_KEYS.forEach((k) => (profile[k] = view[k]))
 
@@ -49,7 +51,7 @@ export function importProfile(file) {
       if (p.startDate !== undefined) conn.startDate = p.startDate
       if (p.endDate !== undefined) conn.endDate = p.endDate
       VIEW_KEYS.forEach((k) => { if (p[k] !== undefined) view[k] = p[k] })
-      adv.apply({ customLogo: p.customLogo, watermarkText: p.watermarkText, graphSize: p.graphSize })
+      adv.apply({ customLogo: p.customLogo, watermarkText: p.watermarkText, graphSize: p.graphSize, reportTitle: p.reportTitle, companyName: p.companyName })
       ui.showAlert('프로필 불러오기', '설정이 성공적으로 적용되었습니다.', 'info')
     } catch (e) {
       ui.showAlert('프로필 오류', '잘못된 형식의 JSON 파일입니다.', 'alert')
