@@ -3,7 +3,6 @@
 import { nextTick } from 'vue'
 import { useUiStore } from '../stores/ui.js'
 import { useDataStore } from '../stores/data.js'
-import { getItemId } from './useFormat.js'
 
 export function usePdfExport() {
   const ui = useUiStore()
@@ -15,22 +14,23 @@ export function usePdfExport() {
       ui.showAlert('추출 오류', '추출할 데이터가 없습니다.', 'alert')
       return
     }
-    const wasEmptySelection = data.selectedIds.length === 0
-    const targetIds = wasEmptySelection ? total.map(getItemId) : data.selectedIds
+    if (data.selectedIds.length === 0) {
+      ui.showAlert('추출 오류', '추출할 항목을 하나 이상 선택해주세요.', 'alert')
+      return
+    }
 
-    if (targetIds.length > 150) {
+    if (data.selectedIds.length > 150) {
       ui.showConfirm(
         '대량 데이터 추출 경고',
         '선택된 항목이 매우 많습니다. 브라우저 메모리가 초과될 수 있습니다.\n그래도 진행하시겠습니까?',
-        () => run(targetIds, wasEmptySelection),
+        () => run(),
       )
     } else {
-      run(targetIds, wasEmptySelection)
+      run()
     }
   }
 
-  async function run(targetIds, wasEmptySelection) {
-    if (wasEmptySelection) data.selectedIds = targetIds
+  async function run() {
     try {
       data.loading = true
       data.error = ''
@@ -94,7 +94,6 @@ export function usePdfExport() {
     } finally {
       ui.isExporting = false
       data.loading = false
-      if (wasEmptySelection) data.selectedIds = []
     }
   }
 

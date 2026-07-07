@@ -9,10 +9,12 @@ import {
 } from '../src/composables/useFormat.js'
 
 describe('getItemId', () => {
-  it('호스트/이벤트/아이템 ID 우선순위', () => {
-    expect(getItemId({ hostid: 'h1' })).toBe('h1')
-    expect(getItemId({ eventid: 'e1' })).toBe('e1')
-    expect(getItemId({ itemid: 'i1' })).toBe('i1')
+  it('호스트/이벤트/아이템 ID 우선순위 + 타입 접두사(전역 유일)', () => {
+    expect(getItemId({ hostid: '1' })).toBe('h-1')
+    expect(getItemId({ eventid: '1' })).toBe('e-1')
+    expect(getItemId({ itemid: '1' })).toBe('i-1')
+    // 타입이 달라도 숫자가 같으면 서로 다른 ID여야 함(충돌 방지)
+    expect(getItemId({ hostid: '1' })).not.toBe(getItemId({ itemid: '1' }))
   })
 })
 

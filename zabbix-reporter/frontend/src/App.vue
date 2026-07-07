@@ -30,7 +30,7 @@ const { exportPdf } = usePdfExport()
 
 const total = computed(() => data.currentTotalData)
 const allSelected = computed(() => total.value.length > 0 && total.value.every((i) => data.selectedIds.includes(getItemId(i))))
-const selectedCount = computed(() => (data.selectedIds.length === 0 ? total.value.length : data.selectedIds.length))
+const selectedCount = computed(() => data.selectedIds.length)
 const hasAnyData = computed(() => data.hostsData.length || data.problemsData.length || data.itemsData.length)
 </script>
 

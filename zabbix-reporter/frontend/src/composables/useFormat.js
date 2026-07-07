@@ -1,8 +1,14 @@
 // 포맷·헬퍼 순수 함수 — 기존 zabbix.html에서 1:1 이전.
 // 동작 동등성이 핵심이므로 계산식/분기를 원본 그대로 유지한다.
 
-/** 항목 고유 ID (호스트/이벤트/아이템 공용) */
-export const getItemId = (item) => item.hostid || item.eventid || item.itemid
+/** 항목 고유 ID (호스트/이벤트/아이템 공용).
+ *  hostid·eventid·itemid는 Zabbix에서 타입별로 독립 시퀀스라 숫자가 겹칠 수 있어,
+ *  타입 접두사를 붙여 전역 유일성을 보장한다(선택/전체선택 충돌 방지). */
+export const getItemId = (item) => {
+  if (item.hostid) return `h-${item.hostid}`
+  if (item.eventid) return `e-${item.eventid}`
+  return `i-${item.itemid}`
+}
 
 /** 수집된 히스토리의 평균값. 없으면 lastvalue. */
 export const getAverageValue = (item) => {

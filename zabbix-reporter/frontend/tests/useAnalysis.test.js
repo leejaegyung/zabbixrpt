@@ -51,7 +51,7 @@ describe('computeAnalysis', () => {
       { hostid: '1', name: 'A', status: '0', interfaces: [{ available: '1' }] },
       { hostid: '2', name: 'B', status: '0', interfaces: [{ available: '2' }] }, // ERROR
     ]
-    const { uptime } = computeAnalysis(mk({ hostsData, selectedIds: ['1', '2'] }))
+    const { uptime } = computeAnalysis(mk({ hostsData, selectedIds: ['h-1', 'h-2'] }))
     expect(uptime.total).toBe(2)
     expect(uptime.errorCount).toBe(1)
     expect(uptime.sla).toBe('50.0')
@@ -63,7 +63,7 @@ describe('computeAnalysis', () => {
       { eventid: 'e2', hosts: [{ name: 'A' }] },
       { eventid: 'e3', hosts: [{ name: 'B' }] },
     ]
-    const { topOffenders } = computeAnalysis(mk({ problemsData, selectedIds: ['e1', 'e2', 'e3'] }))
+    const { topOffenders } = computeAnalysis(mk({ problemsData, selectedIds: ['e-e1', 'e-e2', 'e-e3'] }))
     expect(topOffenders[0]).toEqual({ host: 'A', count: 2 })
     expect(topOffenders[1]).toEqual({ host: 'B', count: 1 })
   })
@@ -72,22 +72,22 @@ describe('computeAnalysis', () => {
     const itemsData = [
       { itemid: 'i1', name: 'CPU utilization', units: '%', hosts: [{ name: 'A' }], history: [{ value: '80' }, { value: '90' }] },
     ]
-    const { combinedTopItems } = computeAnalysis(mk({ itemsData, selectedIds: ['i1'] }))
+    const { combinedTopItems } = computeAnalysis(mk({ itemsData, selectedIds: ['i-i1'] }))
     expect(combinedTopItems[0].cpuVal).toBe(85)
   })
 
   it('급증 감지: %는 10%p 미만이면 제외', () => {
     const small = [{ itemid: 'i1', name: 'mem', units: '%', hosts: [{ name: 'A' }], history: [{ clock: now - DAY, value: '50' }, { clock: now, value: '55' }] }]
     const big = [{ itemid: 'i2', name: 'mem', units: '%', hosts: [{ name: 'A' }], history: [{ clock: now - DAY, value: '50' }, { clock: now, value: '70' }] }]
-    expect(computeAnalysis(mk({ itemsData: small, selectedIds: ['i1'] })).spikes).toHaveLength(0)
-    expect(computeAnalysis(mk({ itemsData: big, selectedIds: ['i2'] })).spikes).toHaveLength(1)
+    expect(computeAnalysis(mk({ itemsData: small, selectedIds: ['i-i1'] })).spikes).toHaveLength(0)
+    expect(computeAnalysis(mk({ itemsData: big, selectedIds: ['i-i2'] })).spikes).toHaveLength(1)
   })
 
   it('급증 감지: 치솟았다 내려온 peak도 감지', () => {
     // 50 → 75 → 52: 끝값(52)만 보면 놓치지만 peak(75)로 감지
     const itemsData = [{ itemid: 'i1', name: 'mem', units: '%', hosts: [{ name: 'A' }], history: [
       { clock: now - 2 * DAY, value: '50' }, { clock: now - DAY, value: '75' }, { clock: now, value: '52' }] }]
-    const { spikes } = computeAnalysis(mk({ itemsData, selectedIds: ['i1'] }))
+    const { spikes } = computeAnalysis(mk({ itemsData, selectedIds: ['i-i1'] }))
     expect(spikes).toHaveLength(1)
     expect(spikes[0].deltaPercent).toBeCloseTo(25, 6)
     expect(spikes[0].lastVal).toBe(75)
@@ -99,7 +99,7 @@ describe('computeAnalysis', () => {
       { itemid: 's1', name: 'Free disk space', units: 'B', hosts: [{ name: 'A' }], history: h }, // 바이트 → 제외
       { itemid: 's2', name: 'Disk space utilization', units: '%', hosts: [{ name: 'B' }], history: h }, // % → 포함
     ]
-    const { storageForecast } = computeAnalysis(mk({ itemsData, selectedIds: ['s1', 's2'] }))
+    const { storageForecast } = computeAnalysis(mk({ itemsData, selectedIds: ['i-s1', 'i-s2'] }))
     expect(storageForecast).toHaveLength(1)
     expect(storageForecast[0].units).toBe('%')
   })
@@ -109,7 +109,7 @@ describe('computeAnalysis', () => {
       { itemid: 'i1', name: 'traffic', units: 'bps', hosts: [{ name: 'A' }], history: [{ value: '500' }] }, // 제외
       { itemid: 'i2', name: 'traffic', units: 'bps', hosts: [{ name: 'B' }], history: [{ value: '50000' }] },
     ]
-    const { networkTop } = computeAnalysis(mk({ itemsData, selectedIds: ['i1', 'i2'] }))
+    const { networkTop } = computeAnalysis(mk({ itemsData, selectedIds: ['i-i1', 'i-i2'] }))
     expect(networkTop).toHaveLength(1)
     expect(networkTop[0].hosts[0].name).toBe('B')
   })
@@ -118,7 +118,7 @@ describe('computeAnalysis', () => {
     const hostsData = [{ hostid: 'h1', name: 'A', status: '0', interfaces: [{ available: '1' }] }]
     const itemsData = [{ itemid: 'i1', name: 'CPU utilization', units: '%', hosts: [{ name: 'A' }], history: [{ value: '90' }] }]
     // 호스트 A(h1)를 선택하지 않음 → A의 아이템 제외
-    const { combinedTopItems } = computeAnalysis(mk({ hostsData, itemsData, selectedIds: ['i1'] }))
+    const { combinedTopItems } = computeAnalysis(mk({ hostsData, itemsData, selectedIds: ['i-i1'] }))
     expect(combinedTopItems).toHaveLength(0)
   })
 })
