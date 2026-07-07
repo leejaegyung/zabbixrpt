@@ -47,7 +47,10 @@ export function usePdfExport() {
       const { default: html2canvas } = await import('html2canvas')
       const { jsPDF } = await import('jspdf')
       const pdf = new jsPDF('p', 'mm', 'a4')
+      const PAGE_W_MM = 210
+      const PAGE_H_MM = 297
 
+      let firstPage = true
       for (let i = 0; i < pages.length; i++) {
         const canvas = await html2canvas(pages[i], {
           scale: 1.5,
@@ -57,9 +60,27 @@ export function usePdfExport() {
           scrollY: 0,
           windowWidth: 1000,
         })
-        const imgData = canvas.toDataURL('image/jpeg', 0.95)
-        if (i > 0) pdf.addPage()
-        pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297)
+
+        // 캡처된 내용 높이가 A4 한 장을 넘으면 여러 장으로 분할(내용 잘림 방지).
+        const pxPerMm = canvas.width / PAGE_W_MM
+        const sliceHpx = Math.floor(PAGE_H_MM * pxPerMm)
+        let offset = 0
+        while (offset < canvas.height - 2) {
+          const curHpx = Math.min(sliceHpx, canvas.height - offset)
+          const slice = document.createElement('canvas')
+          slice.width = canvas.width
+          slice.height = curHpx
+          const ctx = slice.getContext('2d')
+          ctx.fillStyle = '#ffffff'
+          ctx.fillRect(0, 0, slice.width, slice.height)
+          ctx.drawImage(canvas, 0, offset, canvas.width, curHpx, 0, 0, canvas.width, curHpx)
+
+          const imgData = slice.toDataURL('image/jpeg', 0.95)
+          if (!firstPage) pdf.addPage()
+          firstPage = false
+          pdf.addImage(imgData, 'JPEG', 0, 0, PAGE_W_MM, curHpx / pxPerMm)
+          offset += curHpx
+        }
       }
 
       const dateStr = new Date().toISOString().slice(0, 10)

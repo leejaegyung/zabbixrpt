@@ -12,7 +12,7 @@ const adv = useAdvancedStore()
 </script>
 
 <template>
-  <div class="pdf-page bg-gray-50 w-[1000px] h-[1414px] p-12 relative flex flex-col overflow-hidden"
+  <div class="pdf-page bg-gray-50 w-[1000px] min-h-[1414px] p-12 relative flex flex-col"
     :class="cover ? 'justify-center' : 'justify-start'">
     <!-- 워터마크 -->
     <div v-if="adv.watermarkText" class="absolute top-1/2 left-1/2 pointer-events-none z-0 opacity-10"

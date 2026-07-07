@@ -8,10 +8,10 @@ defineProps({
 </script>
 
 <template>
-  <div class="p-6 flex flex-col h-full min-h-[360px]"
+  <div class="p-6 flex flex-col h-full"
     :class="[
       colSpan === 3 ? 'col-span-3' : '',
-      pdf ? 'bg-white border border-gray-200 rounded-2xl shadow-sm' : 'bg-elevated border border-hairline rounded-none',
+      pdf ? 'min-h-[300px] bg-white border border-gray-200 rounded-2xl shadow-sm' : 'min-h-[360px] bg-elevated border border-hairline rounded-none',
     ]">
     <div class="flex items-center mb-5 pb-4 border-b shrink-0" :class="pdf ? 'border-gray-100' : 'border-hairline'">
       <div class="flex items-center justify-center w-8 h-8 mr-3 shrink-0 p-1.5" :class="pdf ? 'bg-gray-50 rounded-lg' : 'bg-elevated-2'">
