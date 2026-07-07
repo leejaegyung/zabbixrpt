@@ -6,8 +6,12 @@ import { getItemId, getAverageValue, getHostStatusInfo } from './useFormat.js'
 export const calculateStoragePrediction = (history) => {
   if (!history || history.length < 5) return { status: 'insufficient' }
 
-  const data = [...history].sort((a, b) => parseInt(a.clock) - parseInt(b.clock))
+  // 비수치·빈 값(Zabbix가 종종 빈 문자열 반환)을 먼저 제거 — 하나라도 섞이면 회귀 합계가 NaN으로 오염됨.
+  const data = history
+    .filter((p) => !isNaN(parseFloat(p.value)) && !isNaN(parseInt(p.clock)))
+    .sort((a, b) => parseInt(a.clock) - parseInt(b.clock))
   const n = data.length
+  if (n < 5) return { status: 'insufficient' }
   const startX = parseInt(data[0].clock)
 
   let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0
@@ -24,23 +28,19 @@ export const calculateStoragePrediction = (history) => {
   if (denominator === 0) return { status: 'stable', current: parseFloat(data[n - 1].value) }
 
   const m = (n * sumXY - sumX * sumY) / denominator
-  const b = (sumY - m * sumX) / n
 
   const currentVal = parseFloat(data[n - 1].value)
-  if (currentVal >= 80) return { status: 'critical', current: currentVal, daysLeft: 0, growthPerDay: m * 86400 }
-  if (m <= 0) return { status: 'stable', current: currentVal, growthPerDay: m * 86400 }
+  const growthPerDay = m * 86400
 
-  const targetX = (80 - b) / m
-  const targetClock = startX + targetX
-  const now = Math.floor(Date.now() / 1000)
+  if (currentVal >= 80) return { status: 'critical', current: currentVal, daysLeft: 0, growthPerDay }
+  if (m <= 0) return { status: 'stable', current: currentVal, growthPerDay }
 
-  const secondsLeft = targetClock - now
-  if (secondsLeft < 0) return { status: 'critical', current: currentVal, daysLeft: 0, growthPerDay: m * 86400 }
+  // 실측 현재값을 기준점으로 회귀 기울기를 외삽 — current·daysLeft·growthPerDay를 서로 정합.
+  // (회귀 절편 b로 외삽하면 마지막 점이 추세선을 벗어날 때 current와 daysLeft가 어긋남)
+  const daysLeft = (80 - currentVal) / growthPerDay
+  if (daysLeft > 365) return { status: 'stable', current: currentVal, growthPerDay }
 
-  const daysLeft = secondsLeft / 86400
-  if (daysLeft > 365) return { status: 'stable', current: currentVal, growthPerDay: m * 86400 }
-
-  return { status: 'warning', current: currentVal, daysLeft: Math.round(daysLeft), growthPerDay: m * 86400 }
+  return { status: 'warning', current: currentVal, daysLeft: Math.round(daysLeft), growthPerDay }
 }
 
 /**
@@ -94,9 +94,11 @@ export const computeAnalysis = ({ hostsData = [], problemsData = [], itemsData =
   // 3. 스토리지 포화 임박 예측
   const storageForecast = activeItems
     .filter(
+      // 예측이 80(%) 임계값과 비교하므로 반드시 백분율 단위여야 함(바이트 단위 오탐 방지).
       (i) =>
-        i.name.toLowerCase().match(/(space|vfs|disk).*(utilization|pused)/i) ||
-        (i.units === '%' && i.name.toLowerCase().includes('space')),
+        i.units === '%' &&
+        (i.name.toLowerCase().match(/(space|vfs|disk).*(utilization|pused)/i) ||
+          i.name.toLowerCase().includes('space')),
     )
     .map((item) => ({ ...item, prediction: calculateStoragePrediction(item.history) }))
     .filter((item) => item.prediction.status !== 'insufficient')
@@ -116,10 +118,12 @@ export const computeAnalysis = ({ hostsData = [], problemsData = [], itemsData =
       const isPercent = item.units === '%'
       const hist = [...item.history].sort((a, b) => parseInt(a.clock) - parseInt(b.clock))
       const first = parseFloat(hist[0].value)
-      const last = parseFloat(hist[hist.length - 1].value)
-      if (isNaN(first) || isNaN(last)) return null
+      const values = hist.map((h) => parseFloat(h.value)).filter((v) => !isNaN(v))
+      if (isNaN(first) || values.length === 0) return null
 
-      const delta = last - first
+      // 구간 내 최댓값(peak) 기준 — 치솟았다 내려온 스파이크도 감지(끝값만 보면 놓침).
+      const peak = Math.max(...values)
+      const delta = peak - first
       if (delta <= 0) return null
 
       let deltaPercent = 0
@@ -132,7 +136,7 @@ export const computeAnalysis = ({ hostsData = [], problemsData = [], itemsData =
         if (deltaPercent < 30) return null
       }
 
-      return { ...item, deltaPercent, lastVal: last, firstVal: first, isPercent }
+      return { ...item, deltaPercent, lastVal: peak, firstVal: first, isPercent }
     })
     .filter(Boolean)
     .sort((a, b) => b.deltaPercent - a.deltaPercent)

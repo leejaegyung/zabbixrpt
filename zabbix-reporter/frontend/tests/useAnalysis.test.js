@@ -24,6 +24,23 @@ describe('calculateStoragePrediction', () => {
     expect(calculateStoragePrediction(history(60, -2)).status).toBe('stable')
     expect(calculateStoragePrediction(history(60, 0)).status).toBe('stable')
   })
+  it('빈 값(비수치)이 섞여도 오염되지 않음', () => {
+    const h = history(60, 2) // 60..70
+    h[2].value = '' // Zabbix가 종종 반환하는 빈 값
+    const pred = calculateStoragePrediction(h)
+    expect(pred.daysLeft).not.toBeNull()
+    expect(Number.isFinite(pred.growthPerDay)).toBe(true)
+    // 유효점이 5개 미만이면 insufficient
+    h[3].value = ''
+    expect(calculateStoragePrediction(h).status).toBe('insufficient')
+  })
+  it('current·daysLeft·growthPerDay가 서로 정합', () => {
+    // 60→70(하루 2%↑), 현재 70 → (80-70)/2 = 5일
+    const pred = calculateStoragePrediction(history(60, 2))
+    expect(pred.current).toBe(70)
+    expect(pred.growthPerDay).toBeCloseTo(2, 6)
+    expect(pred.daysLeft).toBe(5)
+  })
 })
 
 describe('computeAnalysis', () => {
@@ -64,6 +81,27 @@ describe('computeAnalysis', () => {
     const big = [{ itemid: 'i2', name: 'mem', units: '%', hosts: [{ name: 'A' }], history: [{ clock: now - DAY, value: '50' }, { clock: now, value: '70' }] }]
     expect(computeAnalysis(mk({ itemsData: small, selectedIds: ['i1'] })).spikes).toHaveLength(0)
     expect(computeAnalysis(mk({ itemsData: big, selectedIds: ['i2'] })).spikes).toHaveLength(1)
+  })
+
+  it('급증 감지: 치솟았다 내려온 peak도 감지', () => {
+    // 50 → 75 → 52: 끝값(52)만 보면 놓치지만 peak(75)로 감지
+    const itemsData = [{ itemid: 'i1', name: 'mem', units: '%', hosts: [{ name: 'A' }], history: [
+      { clock: now - 2 * DAY, value: '50' }, { clock: now - DAY, value: '75' }, { clock: now, value: '52' }] }]
+    const { spikes } = computeAnalysis(mk({ itemsData, selectedIds: ['i1'] }))
+    expect(spikes).toHaveLength(1)
+    expect(spikes[0].deltaPercent).toBeCloseTo(25, 6)
+    expect(spikes[0].lastVal).toBe(75)
+  })
+
+  it('스토리지 예측: 백분율(%) 단위가 아니면 제외', () => {
+    const h = Array.from({ length: 6 }, (_, i) => ({ clock: now - (5 - i) * DAY, value: String(60 + i * 2) }))
+    const itemsData = [
+      { itemid: 's1', name: 'Free disk space', units: 'B', hosts: [{ name: 'A' }], history: h }, // 바이트 → 제외
+      { itemid: 's2', name: 'Disk space utilization', units: '%', hosts: [{ name: 'B' }], history: h }, // % → 포함
+    ]
+    const { storageForecast } = computeAnalysis(mk({ itemsData, selectedIds: ['s1', 's2'] }))
+    expect(storageForecast).toHaveLength(1)
+    expect(storageForecast[0].units).toBe('%')
   })
 
   it('네트워크 Top: 1Kbps 이하 노드 제외', () => {
