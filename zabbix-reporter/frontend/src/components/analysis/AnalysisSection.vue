@@ -78,7 +78,7 @@ const c = computed(() =>
         <template #icon><Icon name="AlertCircle" class="w-5 h-5 text-rosso" /></template>
         <div v-if="a.topOffenders.length > 0" class="flex flex-col gap-2.5">
           <div v-for="(o, idx) in a.topOffenders" :key="idx" class="flex justify-between items-center p-2.5" :class="c.cell">
-            <span class="font-semibold text-sm truncate pr-2" :class="c.strong" :title="o.host"><span class="text-muted tabular-nums mr-1.5">{{ String(idx + 1).padStart(2, '0') }}</span>{{ o.host }}</span>
+            <span class="font-semibold text-sm truncate pr-2" :class="c.strong" v-ellipsis-tooltip="o.host"><span class="text-muted tabular-nums mr-1.5">{{ String(idx + 1).padStart(2, '0') }}</span>{{ o.host }}</span>
             <span class="text-rosso font-bold text-sm tabular-nums shrink-0">{{ o.count }}</span>
           </div>
         </div>
@@ -91,13 +91,13 @@ const c = computed(() =>
         <div v-if="a.storageForecast.length > 0" class="flex flex-col gap-2.5">
           <div v-for="(item, idx) in a.storageForecast" :key="idx" class="p-2.5" :class="c.cell">
             <div class="flex justify-between items-center mb-1.5 gap-2">
-              <span class="text-xs font-semibold truncate" :class="c.strong" :title="item.hosts?.[0]?.name">{{ item.hosts?.[0]?.name }}</span>
+              <span class="text-xs font-semibold truncate" :class="c.strong" v-ellipsis-tooltip="item.hosts?.[0]?.name">{{ item.hosts?.[0]?.name }}</span>
               <span v-if="item.prediction.status === 'critical'" class="report-badge inline-flex items-center justify-center h-[22px] leading-none text-[10px] px-2 font-bold uppercase tracking-cta bg-rosso text-ink shrink-0">Critical</span>
               <span v-else-if="item.prediction.status === 'warning'" class="report-badge inline-flex items-center justify-center h-[22px] leading-none text-[10px] px-2 font-bold uppercase tracking-cta shrink-0" :class="pdf ? 'bg-orange-100 text-orange-700' : 'text-sig-warning border border-sig-warning/40'">D-{{ item.prediction.daysLeft }}</span>
               <span v-else class="report-badge inline-flex items-center justify-center h-[22px] leading-none text-[10px] px-2 font-bold uppercase tracking-cta shrink-0" :class="pdf ? 'bg-green-50 text-green-700' : 'text-sig-success border border-sig-success/40'">Stable</span>
             </div>
             <div class="flex justify-between items-end gap-2">
-              <span class="text-[10px] truncate flex-1" :class="c.sub" :title="item.name">{{ item.name }}</span>
+              <span class="text-[10px] truncate flex-1" :class="c.sub" v-ellipsis-tooltip="item.name">{{ item.name }}</span>
               <span class="text-sm font-bold tabular-nums shrink-0" :class="c.heading">{{ item.prediction.current.toFixed(1) }}%</span>
             </div>
           </div>
@@ -111,7 +111,7 @@ const c = computed(() =>
         <div v-if="a.combinedTopItems.some((d) => d.cpuItem)" class="flex flex-col gap-3.5 mt-1">
           <div v-for="(d, idx) in a.combinedTopItems" :key="idx">
             <div class="flex justify-between text-xs mb-1.5 gap-2">
-              <span class="font-medium truncate" :class="c.strong" :title="d.hostName">{{ d.hostName }}</span>
+              <span class="font-medium truncate" :class="c.strong" v-ellipsis-tooltip="d.hostName">{{ d.hostName }}</span>
               <span class="font-bold tabular-nums shrink-0" :class="!d.cpuItem ? c.faint : d.cpuVal > 80 ? 'text-rosso' : c.heading">{{ d.cpuItem ? `${d.cpuVal.toFixed(1)}%` : 'N/A' }}</span>
             </div>
             <div class="h-1 w-full overflow-hidden" :class="c.track">
@@ -128,7 +128,7 @@ const c = computed(() =>
         <div v-if="a.combinedTopItems.some((d) => d.memItem)" class="flex flex-col gap-3.5 mt-1">
           <div v-for="(d, idx) in a.combinedTopItems" :key="idx">
             <div class="flex justify-between text-xs mb-1.5 gap-2">
-              <span class="font-medium truncate" :class="c.strong" :title="d.hostName">{{ d.hostName }}</span>
+              <span class="font-medium truncate" :class="c.strong" v-ellipsis-tooltip="d.hostName">{{ d.hostName }}</span>
               <span class="font-bold tabular-nums shrink-0" :class="!d.memItem ? c.faint : d.memVal > 80 ? 'text-rosso' : c.heading">{{ d.memItem ? `${d.memVal.toFixed(1)}%` : 'N/A' }}</span>
             </div>
             <div class="h-1 w-full overflow-hidden" :class="c.track">
@@ -146,11 +146,11 @@ const c = computed(() =>
         <div v-if="a.spikes.length > 0" class="flex flex-col gap-2.5">
           <div v-for="(item, idx) in a.spikes" :key="idx" class="flex flex-col p-2.5" :class="c.cell">
             <div class="flex justify-between items-center mb-1 gap-2">
-              <span class="font-semibold text-xs truncate" :class="c.strong" :title="item.hosts?.[0]?.name">{{ item.hosts?.[0]?.name }}</span>
+              <span class="font-semibold text-xs truncate" :class="c.strong" v-ellipsis-tooltip="item.hosts?.[0]?.name">{{ item.hosts?.[0]?.name }}</span>
               <span class="text-rosso font-bold text-[11px] tabular-nums shrink-0">+{{ item.deltaPercent.toFixed(1) }}{{ item.isPercent ? '%p' : '%' }}</span>
             </div>
             <div class="text-[10px] flex justify-between items-end gap-2" :class="c.sub">
-              <span class="truncate flex-1" :title="item.name">{{ item.name }}</span>
+              <span class="truncate flex-1" v-ellipsis-tooltip="item.name">{{ item.name }}</span>
               <span class="shrink-0 tabular-nums">{{ item.firstVal.toFixed(1) }} → <strong class="text-rosso">{{ item.lastVal.toFixed(1) }}</strong></span>
             </div>
           </div>
@@ -165,8 +165,8 @@ const c = computed(() =>
         <div v-if="a.networkTop.length > 0" class="grid gap-2.5 mt-1" :class="pdf ? 'grid-cols-3' : 'grid-cols-1'">
           <div v-for="(item, idx) in a.networkTop" :key="idx" class="flex justify-between items-center p-3.5 gap-2" :class="c.cell">
             <div class="min-w-0 flex-1">
-              <div class="font-semibold text-sm truncate mb-0.5" :class="c.strong" :title="item.hosts?.[0]?.name">{{ item.hosts?.[0]?.name }}</div>
-              <div class="text-xs truncate" :class="c.sub" :title="item.name">{{ item.name }}</div>
+              <div class="font-semibold text-sm truncate mb-0.5" :class="c.strong" v-ellipsis-tooltip="item.hosts?.[0]?.name">{{ item.hosts?.[0]?.name }}</div>
+              <div class="text-xs truncate" :class="c.sub" v-ellipsis-tooltip="item.name">{{ item.name }}</div>
             </div>
             <div class="text-base font-bold tabular-nums text-sig-info ml-3 shrink-0">{{ netValue(item) }}</div>
           </div>
