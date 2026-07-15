@@ -19,27 +19,31 @@ export const getAverageValue = (item) => {
   return parseFloat(item.lastvalue) || 0
 }
 
+/** 임의의 숫자값을 단위(B/bps/%)에 따라 사람친화 포맷.
+ *  값 표시와 그래프 min/max 라벨이 동일한 표기를 쓰도록 공용화. */
+export const formatValueByUnits = (val, units) => {
+  const u = units ? String(units).toLowerCase() : ''
+  if (!Number.isFinite(val)) return '-'
+
+  if (u === 'b') {
+    if (val > 1073741824) return (val / 1073741824).toFixed(2) + ' GB'
+    if (val > 1048576) return (val / 1048576).toFixed(2) + ' MB'
+    return val + ' B'
+  }
+  if (u === 'bps') {
+    if (val > 1000000000) return (val / 1000000000).toFixed(2) + ' Gbps'
+    if (val > 1000000) return (val / 1000000).toFixed(2) + ' Mbps'
+    if (val > 1000) return (val / 1000).toFixed(2) + ' Kbps'
+    return val.toFixed(2) + ' bps'
+  }
+  return val.toFixed(2) + (units ? ` ${units}` : '')
+}
+
 /** 단위(B/bps/%)에 따른 사람친화 포맷 */
 export const formatItemValue = (item) => {
-  let formattedValue = item.lastvalue
-  const units = item.units ? item.units.toLowerCase() : ''
   const val = parseFloat(item.lastvalue)
-  if (isNaN(val)) return formattedValue + (item.units ? ` ${item.units}` : '')
-
-  if (units === 'b') {
-    if (val > 1073741824) formattedValue = (val / 1073741824).toFixed(2) + ' GB'
-    else if (val > 1048576) formattedValue = (val / 1048576).toFixed(2) + ' MB'
-    else formattedValue = val + ' B'
-  } else if (units === 'bps') {
-    if (val > 1000000000) formattedValue = (val / 1000000000).toFixed(2) + ' Gbps'
-    else if (val > 1000000) formattedValue = (val / 1000000).toFixed(2) + ' Mbps'
-    else if (val > 1000) formattedValue = (val / 1000).toFixed(2) + ' Kbps'
-    else formattedValue = val.toFixed(2) + ' bps'
-  } else {
-    formattedValue = val.toFixed(2)
-    if (item.units) formattedValue += ` ${item.units}`
-  }
-  return formattedValue
+  if (isNaN(val)) return item.lastvalue + (item.units ? ` ${item.units}` : '')
+  return formatValueByUnits(val, item.units)
 }
 
 /** 심각도 → Tailwind 색상 클래스 */

@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { formatValueByUnits } from '../../composables/useFormat.js'
 
 const props = defineProps({
   item: {
@@ -70,11 +71,7 @@ const areaPoints = computed(() => {
 
 const formatNumber = (value) => {
   if (!Number.isFinite(value)) return '-'
-  if (Math.abs(value) >= 1000000) return value.toExponential(2)
-  if (Math.abs(value) >= 100) return value.toFixed(0)
-  if (Math.abs(value) >= 10) return value.toFixed(1)
-
-  return value.toFixed(2)
+  return formatValueByUnits(value, props.item.units)
 }
 </script>
 
