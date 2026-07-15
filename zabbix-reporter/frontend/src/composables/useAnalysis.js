@@ -150,14 +150,22 @@ export const computeAnalysis = ({ hostsData = [], problemsData = [], itemsData =
     .sort((a, b) => b.avgValue - a.avgValue)
     .slice(0, 5)
 
-  // 2. 요주의 서버 (알람 최다)
-  const problemCount = {}
+  // 2. 요주의 서버 (알람 최다) — 개수 클릭 시 상세 표기용으로 알림 목록도 함께 보관.
+  const problemsByHost = {}
   activeProblems.forEach((p) => {
     const hName = p.hosts?.[0]?.name || 'Unknown Host'
-    problemCount[hName] = (problemCount[hName] || 0) + 1
+    if (!problemsByHost[hName]) problemsByHost[hName] = []
+    problemsByHost[hName].push(p)
   })
-  const topOffenders = Object.entries(problemCount)
-    .map(([host, count]) => ({ host, count }))
+  const topOffenders = Object.entries(problemsByHost)
+    .map(([host, problems]) => ({
+      host,
+      count: problems.length,
+      // 심각도 높은 순 → 최신순 정렬해 상세 목록을 의미있게 노출.
+      problems: [...problems].sort(
+        (a, b) => (Number(b.severity) - Number(a.severity)) || (Number(b.clock) - Number(a.clock)),
+      ),
+    }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 5)
 

@@ -64,8 +64,10 @@ describe('computeAnalysis', () => {
       { eventid: 'e3', hosts: [{ name: 'B' }] },
     ]
     const { topOffenders } = computeAnalysis(mk({ problemsData, selectedIds: ['e-e1', 'e-e2', 'e-e3'] }))
-    expect(topOffenders[0]).toEqual({ host: 'A', count: 2 })
-    expect(topOffenders[1]).toEqual({ host: 'B', count: 1 })
+    expect(topOffenders[0]).toMatchObject({ host: 'A', count: 2 })
+    expect(topOffenders[0].problems).toHaveLength(2)
+    expect(topOffenders[1]).toMatchObject({ host: 'B', count: 1 })
+    expect(topOffenders[1].problems).toHaveLength(1)
   })
 
   it('CPU Top: 평균 점유율 집계', () => {

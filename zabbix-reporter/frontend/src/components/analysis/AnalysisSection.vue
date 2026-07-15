@@ -1,9 +1,9 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, watch, ref } from 'vue'
 import { useDataStore } from '../../stores/data.js'
 import { useViewSettingsStore } from '../../stores/viewSettings.js'
 import { computeAnalysis } from '../../composables/useAnalysis.js'
-import { formatItemValue } from '../../composables/useFormat.js'
+import { formatItemValue, getSeverityColor, getSeverityText } from '../../composables/useFormat.js'
 import Icon from '../common/Icon.vue'
 import AnalysisCard from './AnalysisCard.vue'
 
@@ -23,6 +23,14 @@ const a = computed(() =>
   }),
 )
 const netValue = (item) => formatItemValue({ ...item, lastvalue: item.avgValue })
+
+// 요주의 서버: 개수 클릭 시 해당 호스트의 알림 목록 펼치기(웹 전용).
+const openOffender = ref(null)
+const toggleOffender = (host) => { openOffender.value = openOffender.value === host ? null : host }
+const fmtDateTime = (clock) => {
+  const d = new Date(parseInt(clock) * 1000)
+  return `${d.toLocaleDateString('ko-KR')} ${d.toLocaleTimeString('ko-KR')}`
+}
 
 // 선택된 항목이 없으면 분석 결과가 비어(오해 소지) → 웹 화면에서 자동으로 접고, 다시 선택되면 펼침.
 const hasSelection = computed(() => data.selectedIds.length > 0)
@@ -77,9 +85,28 @@ const c = computed(() =>
       <AnalysisCard v-if="view.showAnalysisOffenders" :pdf="pdf" title="요주의 서버 (알람 최다)">
         <template #icon><Icon name="AlertCircle" class="w-5 h-5 text-rosso" /></template>
         <div v-if="a.topOffenders.length > 0" class="flex flex-col gap-2.5">
-          <div v-for="(o, idx) in a.topOffenders" :key="idx" class="flex justify-between items-center p-2.5" :class="c.cell">
-            <span class="font-semibold text-sm truncate pr-2" :class="c.strong" v-ellipsis-tooltip="o.host"><span class="text-muted tabular-nums mr-1.5">{{ String(idx + 1).padStart(2, '0') }}</span>{{ o.host }}</span>
-            <span class="text-rosso font-bold text-sm tabular-nums shrink-0">{{ o.count }}</span>
+          <div v-for="(o, idx) in a.topOffenders" :key="idx">
+            <div class="flex justify-between items-center p-2.5" :class="c.cell">
+              <span class="font-semibold text-sm truncate pr-2" :class="c.strong" v-ellipsis-tooltip="o.host"><span class="text-muted tabular-nums mr-1.5">{{ String(idx + 1).padStart(2, '0') }}</span>{{ o.host }}</span>
+              <!-- 웹: 개수 클릭 시 알림 목록 토글 / PDF: 정적 숫자 -->
+              <button v-if="!pdf" @click="toggleOffender(o.host)" type="button"
+                class="flex items-center gap-1 text-rosso font-bold text-sm tabular-nums shrink-0 hover:opacity-70 transition"
+                :title="openOffender === o.host ? '알림 접기' : '알림 상세 보기'">
+                {{ o.count }}
+                <Icon name="ChevronDown" class="w-3.5 h-3.5 transition-transform" :class="{ 'rotate-180': openOffender === o.host }" />
+              </button>
+              <span v-else class="text-rosso font-bold text-sm tabular-nums shrink-0">{{ o.count }}</span>
+            </div>
+            <!-- 알림 상세 목록 -->
+            <div v-if="!pdf && openOffender === o.host" class="mt-1 flex flex-col gap-1.5 px-2.5 py-2.5" :class="c.cell">
+              <div v-for="(p, pi) in o.problems" :key="pi" class="flex items-start gap-2">
+                <span class="pill shrink-0" :class="getSeverityColor(p.severity)">{{ getSeverityText(p.severity) }}</span>
+                <div class="min-w-0 flex-1">
+                  <div class="text-xs break-words leading-snug" :class="c.strong">{{ p.name }}</div>
+                  <div class="text-[10px] tabular-nums mt-0.5" :class="c.faint">{{ fmtDateTime(p.clock) }}</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <p v-else class="text-sm text-center py-4" :class="c.faint">조회된 문제(알람)가 없습니다.</p>
