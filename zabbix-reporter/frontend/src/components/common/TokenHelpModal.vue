@@ -10,7 +10,7 @@ const steps = [
   '<b class="font-semibold">Create API token</b> 클릭',
   '이름·만료일을 지정하고 대상 사용자 선택',
   '생성된 <b class="font-semibold">Auth token</b> 문자열을 복사',
-  '좌측 <b class="font-semibold">API Token</b> 입력칸에 붙여넣기',
+  '서버 <b class="font-semibold">.env</b>의 <b class="font-semibold">ZABBIX_API_TOKEN</b>에 붙여넣고 서비스 재배포',
 ]
 </script>
 

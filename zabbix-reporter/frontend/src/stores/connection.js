@@ -1,29 +1,15 @@
 import { defineStore } from 'pinia'
 import { getLocalMonthAgoStartString, getLocalTodayEndString } from '../composables/useFormat.js'
 
-const savedToken = localStorage.getItem('zabbixApiToken') || sessionStorage.getItem('zabbixApiToken') || ''
-if (savedToken) localStorage.setItem('zabbixApiToken', savedToken)
-
+// Zabbix API URL·토큰은 서버(.env: ZABBIX_API_URL / ZABBIX_API_TOKEN)에서만 관리한다.
+// 프론트는 조회 기간만 보관하고, 프록시가 서버 설정 값을 쓰도록 요청에 자격정보를 싣지 않는다.
 export const useConnectionStore = defineStore('connection', {
   state: () => ({
-    url: localStorage.getItem('zabbixApiUrl') || '',
-    token: savedToken,
     startDate: getLocalMonthAgoStartString(),
     endDate: getLocalTodayEndString(),
   }),
   getters: {
-    conn: (s) => ({ url: s.url.trim(), token: s.token.trim() }),
     timeFrom: (s) => (s.startDate ? Math.floor(new Date(s.startDate).getTime() / 1000) : undefined),
     timeTill: (s) => (s.endDate ? Math.floor(new Date(s.endDate).getTime() / 1000) : undefined),
-  },
-  actions: {
-    setUrl(v) {
-      this.url = v
-      localStorage.setItem('zabbixApiUrl', v)
-    },
-    setToken(v) {
-      this.token = v
-      localStorage.setItem('zabbixApiToken', v)
-    },
   },
 })

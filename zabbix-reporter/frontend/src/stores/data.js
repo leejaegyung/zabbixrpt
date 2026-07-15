@@ -59,11 +59,10 @@ export const useDataStore = defineStore('data', {
   },
   actions: {
     async call(method, params) {
-      const conn = useConnectionStore().conn
       const ui = useUiStore()
 
       try {
-        return await callZabbixApi(method, params, conn)
+        return await callZabbixApi(method, params)
       } catch (err) {
         if (err instanceof ZabbixApiError) alertForError(ui, err)
         throw err

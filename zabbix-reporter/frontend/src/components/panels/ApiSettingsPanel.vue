@@ -42,18 +42,8 @@ const inputCls = 'field cursor-pointer'
     </div>
 
     <div class="space-y-5">
+      <!-- 기간 설정 (API URL·토큰은 서버 .env에서 관리) -->
       <div>
-        <label class="eyebrow block mb-2">Zabbix API URL</label>
-        <input type="text" :value="conn.url" @input="conn.setUrl($event.target.value)" class="field" />
-      </div>
-      <div>
-        <label class="eyebrow block mb-2">API Token</label>
-        <input type="password" :value="conn.token" @input="conn.setToken($event.target.value)"
-          placeholder="Zabbix 7.0+ Bearer token" class="field" />
-      </div>
-
-      <!-- 기간 설정 -->
-      <div class="pt-4 border-t border-hairline">
         <label class="eyebrow flex items-center mb-3"><Icon name="Calendar" class="w-3.5 h-3.5 mr-2 text-muted-soft" /> Time Range</label>
         <div class="flex flex-col gap-4">
           <div class="flex flex-col gap-2">

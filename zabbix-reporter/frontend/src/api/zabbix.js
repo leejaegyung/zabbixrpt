@@ -8,8 +8,6 @@ export class ZabbixApiError extends Error {
   }
 }
 
-const isAbsoluteHttpUrl = (value) => /^https?:\/\//i.test(value)
-
 const validationMessage = (payload) => {
   if (!payload?.errors) return ''
 
@@ -19,15 +17,10 @@ const validationMessage = (payload) => {
     .join('\n')
 }
 
-export async function callZabbixApi(method, params = {}, conn = {}) {
+// URL·토큰은 서버 프록시가 .env 설정으로 처리하므로 요청 본문/헤더에 싣지 않는다.
+export async function callZabbixApi(method, params = {}) {
   const headers = { 'Content-Type': 'application/json', Accept: 'application/json' }
-  const token = conn.token?.trim()
-  const url = conn.url?.trim()
-
-  if (token) headers.Authorization = `Bearer ${token}`
-
   const body = { method, params }
-  if (url && isAbsoluteHttpUrl(url)) body.url = url
 
   let response
   try {

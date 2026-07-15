@@ -18,7 +18,6 @@ export function exportProfile() {
   const ui = useUiStore()
 
   const profile = {
-    url: conn.url,
     startDate: conn.startDate,
     endDate: conn.endDate,
     customLogo: adv.customLogo,
@@ -47,7 +46,6 @@ export function importProfile(file) {
   reader.onload = (evt) => {
     try {
       const p = JSON.parse(evt.target.result)
-      if (p.url) conn.setUrl(p.url)
       if (p.startDate !== undefined) conn.startDate = p.startDate
       if (p.endDate !== undefined) conn.endDate = p.endDate
       VIEW_KEYS.forEach((k) => { if (p[k] !== undefined) view[k] = p[k] })
