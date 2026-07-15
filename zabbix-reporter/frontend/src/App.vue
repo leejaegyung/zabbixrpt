@@ -50,6 +50,12 @@ const hasAnyData = computed(() => data.hostsData.length || data.problemsData.len
         <p class="eyebrow mb-2">Rendering Report</p>
         <p class="display-title text-xl mb-1">PDF 보고서를 생성하는 중입니다</p>
         <p class="text-sm text-muted">선택한 항목을 A4 페이지로 변환하고 있습니다.</p>
+        <template v-if="ui.exportProgress.total > 0">
+          <div class="w-64 h-1.5 bg-elevated-2 mt-6 overflow-hidden">
+            <div class="h-full bg-rosso transition-all duration-200" :style="{ width: `${Math.round((ui.exportProgress.current / ui.exportProgress.total) * 100)}%` }"></div>
+          </div>
+          <p class="text-[11px] uppercase tracking-cta text-muted mt-2 tabular-nums">페이지 {{ ui.exportProgress.current }} / {{ ui.exportProgress.total }}</p>
+        </template>
       </div>
 
       <div :class="ui.isExporting ? 'hidden' : 'block'">

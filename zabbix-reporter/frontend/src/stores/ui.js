@@ -7,6 +7,7 @@ export const useUiStore = defineStore('ui', {
     isTokenHelpOpen: false,
     isSettingsOpen: false,
     isExporting: false,
+    exportProgress: { current: 0, total: 0 }, // PDF 생성 진행률(페이지 단위)
   }),
   actions: {
     showAlert(title, message, type = 'alert') {

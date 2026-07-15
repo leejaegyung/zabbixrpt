@@ -35,6 +35,7 @@ export function usePdfExport() {
       data.loading = true
       data.error = ''
       ui.isExporting = true
+      ui.exportProgress = { current: 0, total: 0 }
       window.scrollTo(0, 0)
 
       // 오프스크린 ReportPreview 렌더 + 폰트/그래프 이미지 로드 대기
@@ -43,10 +44,17 @@ export function usePdfExport() {
       if (document.fonts?.ready) {
         try { await document.fonts.ready } catch { /* 폰트 API 미지원 무시 */ }
       }
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      // fonts.ready 이후엔 레이아웃 정착만 필요 — 고정 1500ms는 과함(600ms로 단축).
+      await new Promise((resolve) => setTimeout(resolve, 600))
 
       const pages = document.querySelectorAll('.pdf-page')
       if (!pages || pages.length === 0) throw new Error('렌더링된 페이지를 찾을 수 없습니다.')
+
+      ui.exportProgress = { current: 0, total: pages.length }
+
+      // 적응형 해상도: 페이지가 많으면 화질보다 속도 우선(픽셀 작업량·인코딩 ~44%↓).
+      // 소량 리포트는 기존 화질(scale 2) 유지.
+      const scale = pages.length > 8 ? 1.5 : 2
 
       const { default: html2canvas } = await import('html2canvas')
       const { jsPDF } = await import('jspdf')
@@ -57,7 +65,7 @@ export function usePdfExport() {
       let firstPage = true
       for (let i = 0; i < pages.length; i++) {
         const canvas = await html2canvas(pages[i], {
-          scale: 2, // 텍스트·아이콘 선명도 향상
+          scale,
           useCORS: true,
           logging: false,
           backgroundColor: '#ffffff',
@@ -85,6 +93,10 @@ export function usePdfExport() {
           pdf.addImage(imgData, 'JPEG', 0, 0, PAGE_W_MM, curHpx / pxPerMm)
           offset += curHpx
         }
+
+        // 진행률 갱신 + 메인 스레드 양보 — 오버레이가 갱신되고 브라우저가 멈추지 않음.
+        ui.exportProgress = { current: i + 1, total: pages.length }
+        await new Promise((resolve) => setTimeout(resolve, 0))
       }
 
       const dateStr = new Date().toISOString().slice(0, 10)
@@ -93,6 +105,7 @@ export function usePdfExport() {
       ui.showAlert('PDF 생성 오류', `상세 원인: ${err.message || err}`, 'alert')
     } finally {
       ui.isExporting = false
+      ui.exportProgress = { current: 0, total: 0 }
       data.loading = false
     }
   }
