@@ -69,11 +69,11 @@ const lastClock = (item) => new Date(parseInt(item.lastclock) * 1000).toLocaleSt
                 <p class="text-[10px] font-semibold text-muted-soft uppercase tracking-cta break-words mb-1">{{ item.hosts?.[0]?.name || 'Unknown Host' }}</p>
                 <h3 class="text-lg font-medium text-ink leading-snug break-words" :title="item.name">{{ item.name }}</h3>
               </div>
-              <div class="text-right shrink-0 min-w-max flex flex-col items-end gap-2">
-                <div class="flex items-center justify-center cursor-pointer w-7 h-7 bg-elevated-2 border border-hairline-strong hover:border-rosso transition-colors" @click="data.toggleSelection(getItemId(item))">
+              <div class="text-right shrink-0 max-w-[45%] min-w-0 flex flex-col items-end gap-2">
+                <div class="shrink-0 flex items-center justify-center cursor-pointer w-7 h-7 bg-elevated-2 border border-hairline-strong hover:border-rosso transition-colors" @click="data.toggleSelection(getItemId(item))">
                   <input type="checkbox" :checked="data.selectedIds.includes(getItemId(item))" readonly class="w-4 h-4 cursor-pointer rounded-none bg-transparent border-0 text-rosso pointer-events-none" />
                 </div>
-                <p class="stat-number text-2xl text-ink whitespace-nowrap break-keep">{{ formatItemValue(item) }}</p>
+                <p class="stat-number text-2xl text-ink break-all">{{ formatItemValue(item) }}</p>
               </div>
             </div>
             <div class="flex-grow w-full bg-canvas border border-hairline overflow-hidden relative flex justify-center items-center">

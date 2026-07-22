@@ -189,7 +189,7 @@ const coverStats = computed(() => {
               <p class="text-xs font-bold text-gray-500 uppercase tracking-wider break-words">{{ item.hosts?.[0]?.name || 'Unknown Host' }}</p>
               <h3 class="text-lg font-bold text-gray-900 break-words" :title="item.name">{{ item.name }}</h3>
             </div>
-            <p class="text-xl font-black text-blue-600 whitespace-nowrap shrink-0">{{ formatItemValue(item) }}</p>
+            <p class="text-xl font-black text-blue-600 text-right shrink-0 max-w-[45%] break-all">{{ formatItemValue(item) }}</p>
           </div>
           <div class="flex-grow w-full bg-gray-50 border border-gray-100 rounded-lg overflow-hidden flex justify-center items-center min-h-[120px]">
             <ItemSparkline :item="item" light />

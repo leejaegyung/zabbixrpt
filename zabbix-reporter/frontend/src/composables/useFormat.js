@@ -36,6 +36,9 @@ export const formatValueByUnits = (val, units) => {
     if (val > 1000) return (val / 1000).toFixed(2) + ' Kbps'
     return val.toFixed(2) + ' bps'
   }
+  // 매우 큰 수(예: 2^63 등 사실상 무제한 표기)는 지수로 축약해
+  // 카드 제목이 세로로 쪼개지는 레이아웃 붕괴를 막는다.
+  if (Math.abs(val) >= 1e12) return val.toExponential(2) + (units ? ` ${units}` : '')
   return val.toFixed(2) + (units ? ` ${units}` : '')
 }
 
